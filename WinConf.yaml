@@ -1,23 +1,19 @@
 ---
-- name: Connect to Windows 2016 Server via SSH
+- name: Start patch installation on Windows Server 2016
   hosts: 192.168.29.155
   gather_facts: no
   tasks:
-    - name: Check SSH connectivity
-      ansible.builtin.command: "whoami"
-      register: ssh_result
-      ignore_errors: yes
+    - name: Ensure WinRM or SSH is configured
+      win_ping:
 
-    - name: Log success
-      ansible.builtin.lineinfile:
-        path: "/var/log/ansible/windows_ssh_log.txt"
-        line: "SUCCESS: {{ inventory_hostname }} connected successfully as {{ ssh_result.stdout }}"
-        create: yes
-      when: ssh_result.rc == 0
+    - name: Install Windows Updates
+      win_updates:
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+        reboot: yes
+      register: update_result
 
-    - name: Log failure
-      ansible.builtin.lineinfile:
-        path: "/var/log/ansible/windows_ssh_log.txt"
-        line: "FAILURE: {{ inventory_hostname }} connection failed - {{ ssh_result.stderr }}"
-        create: yes
-      when: ssh_result.rc != 0
+    - name: Display update results
+      debug:
+        var: update_result
