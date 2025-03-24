@@ -1,45 +1,23 @@
 ---
-- name: Gather Windows System Configuration
-  hosts: windows
+- name: Connect to Windows 2016 Server via SSH
+  hosts: 192.168.29.155
   gather_facts: no
   tasks:
-    - name: Get System Information
-      ansible.windows.win_shell: systeminfo
-      register: system_info
+    - name: Check SSH connectivity
+      ansible.builtin.command: "whoami"
+      register: ssh_result
+      ignore_errors: yes
 
-    - name: Get CPU Information
-      ansible.windows.win_shell: "wmic cpu get Name, NumberOfCores, NumberOfLogicalProcessors"
-      register: cpu_info
+    - name: Log success
+      ansible.builtin.lineinfile:
+        path: "/var/log/ansible/windows_ssh_log.txt"
+        line: "SUCCESS: {{ inventory_hostname }} connected successfully as {{ ssh_result.stdout }}"
+        create: yes
+      when: ssh_result.rc == 0
 
-    - name: Get Memory Information
-      ansible.windows.win_shell: "wmic memorychip get Capacity, Manufacturer, Speed"
-      register: memory_info
-
-    - name: Get Disk Space Information
-      ansible.windows.win_shell: "wmic logicaldisk get DeviceID, Size, FreeSpace"
-      register: disk_info
-
-    - name: Get Network Configuration
-      ansible.windows.win_shell: "ipconfig /all"
-      register: network_info
-
-    - name: Display System Information
-      debug:
-        msg: "{{ system_info.stdout_lines }}"
-
-    - name: Display CPU Information
-      debug:
-        msg: "{{ cpu_info.stdout_lines }}"
-
-    - name: Display Memory Information
-      debug:
-        msg: "{{ memory_info.stdout_lines }}"
-
-    - name: Display Disk Space Information
-      debug:
-        msg: "{{ disk_info.stdout_lines }}"
-
-    - name: Display Network Configuration
-      debug:
-        msg: "{{ network_info.stdout_lines }}"
-
+    - name: Log failure
+      ansible.builtin.lineinfile:
+        path: "/var/log/ansible/windows_ssh_log.txt"
+        line: "FAILURE: {{ inventory_hostname }} connection failed - {{ ssh_result.stderr }}"
+        create: yes
+      when: ssh_result.rc != 0
