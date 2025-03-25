@@ -10,20 +10,20 @@
 
     - name: Ensure log directory exists
       ansible.builtin.file:
-        path: "C:\ansible_logs"
+        path: "C:\\ansible_logs"
         state: directory
         mode: '0755'
 
     - name: Log success
       ansible.builtin.lineinfile:
-        path: "C:\ansible_logs\windows_ssh_log.txt"
+        path: "C:\\ansible_logs\\windows_ssh_log.txt"
         line: "SUCCESS: {{ inventory_hostname }} connected successfully as {{ ssh_result.stdout }}"
         create: yes
       when: ssh_result.rc == 0
 
     - name: Log failure
       ansible.builtin.lineinfile:
-        path: "C:\ansible_logs\windows_ssh_log.txt"
+        path: "C:\\ansible_logs\\windows_ssh_log.txt"
         line: "FAILURE: {{ inventory_hostname }} connection failed - {{ ssh_result.stderr }}"
         create: yes
       when: ssh_result.rc != 0
