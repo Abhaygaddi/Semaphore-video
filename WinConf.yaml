@@ -1,4 +1,4 @@
-- name: Enable and Start Windows Update Service, then Search for Updates
+- name: Enable, Start Windows Update Service, and Check for Updates
   hosts: windows
   tasks:
     - name: Ensure Windows Update Service is Enabled
@@ -11,7 +11,7 @@
         name: wuauserv
         state: started
 
-    - name: Search for Available Windows Updates
+    - name: Check for Available Windows Updates
       win_updates:
         category_names:
           - SecurityUpdates
