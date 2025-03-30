@@ -1,53 +1,18 @@
-- name: Enable, Start Windows Update Service, Check for Updates, and Install
-  hosts: windows
+---
+- name: Manage Windows Updates on Windows Server 2016
+  hosts: WIN2016DC
+  gather_facts: no
   tasks:
-    - name: Ensure Windows Update Service is Enabled
-      win_service:
-        name: wuauserv
-        start_mode: auto
-
-    - name: Start Windows Update Service
+    - name: Start Windows Update service if disabled
       win_service:
         name: wuauserv
         state: started
+        start_mode: auto
 
-    - name: Trigger Windows Update Check from Update Console
-      win_shell: |
-        (New-Object -ComObject Microsoft.Update.AutoUpdate).DetectNow()
-      register: update_check_result
-
-    - name: Display Update Check Status
-      debug:
-        var: update_check_result
-
-    - name: Install All Available Windows Updates
-      win_shell: |
-        $Session = New-Object -ComObject Microsoft.Update.Session
-        $Searcher = $Session.CreateUpdateSearcher()
-        $SearchResult = $Searcher.Search("IsInstalled=0")
-        $Updates = $SearchResult.Updates
-
-        if ($Updates.Count -gt 0) {
-            Write-Output "Updates Found: $($Updates.Count)"
-            $Downloader = $Session.CreateUpdateDownloader()
-            $Downloader.Updates = $Updates
-            $Downloader.Download()
-
-            $Installer = $Session.CreateUpdateInstaller()
-            $Installer.Updates = $Updates
-            $Result = $Installer.Install()
-            Write-Output "Installation Result: $($Result.ResultCode)"
-        } else {
-            Write-Output "No Updates Available"
-        }
-      register: install_result
-      changed_when: "'Installation Result: 2' in install_result.stdout"
-
-    - name: Display Installed Updates
-      debug:
-        var: install_result.stdout
-
-    - name: Reboot Server if Required
-      win_reboot:
-        reboot_timeout: 1800
-      when: install_result is changed
+    - name: Check for Windows Updates
+      win_updates:
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+          - UpdateRollups
+        reboot: yes
