@@ -1,12 +1,17 @@
-- name: Manage Windows Updates
+- name: Enable and Start Windows Update Service, then Search for Updates
   hosts: windows
   tasks:
+    - name: Ensure Windows Update Service is Enabled
+      win_service:
+        name: wuauserv
+        start_mode: auto
+
     - name: Start Windows Update Service
       win_service:
         name: wuauserv
         state: started
 
-    - name: Search for available updates
+    - name: Search for Available Windows Updates
       win_updates:
         category_names:
           - SecurityUpdates
@@ -14,6 +19,6 @@
         state: searched
       register: update_result
 
-    - name: Display available updates
+    - name: Display Available Updates
       debug:
         var: update_result.updates
