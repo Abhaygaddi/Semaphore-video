@@ -1,4 +1,4 @@
-- name: Enable, Start Windows Update Service, and Check for Updates
+- name: Enable, Start, Check, and Install Windows Updates
   hosts: windows
   tasks:
     - name: Ensure Windows Update Service is Enabled
@@ -22,3 +22,15 @@
     - name: Display Available Updates
       debug:
         var: update_result.updates
+
+    - name: Install Windows Updates
+      win_updates:
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+        reboot: yes
+      register: install_result
+
+    - name: Display Installed Updates
+      debug:
+        var: install_result.installed_updates
