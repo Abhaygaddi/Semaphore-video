@@ -1,18 +1,43 @@
----
-- name: Manage Windows Updates on Windows Server 2016
-  hosts: WIN2016DC
-  gather_facts: no
+- name: Enable, Start Windows Update Service, Check for Updates, and Install
+  hosts: windows
   tasks:
-    - name: Start Windows Update service if disabled
+    - name: Ensure Windows Update Service is Enabled
+      win_service:
+        name: wuauserv
+        start_mode: auto
+
+    - name: Start Windows Update Service
       win_service:
         name: wuauserv
         state: started
-        start_mode: auto
 
-    - name: Check for Windows Updates
-      win_updates:
-        category_names:
-          - SecurityUpdates
-          - CriticalUpdates
-          - UpdateRollups
-        reboot: yes
+    - name: Trigger Windows Update Check from Update Console
+      win_shell: |
+        (New-Object -ComObject Microsoft.Update.AutoUpdate).DetectNow()
+      register: update_check_result
+
+    - name: Display Update Check Status
+      debug:
+        var: update_check_result
+
+    - name: Install Windows Updates via Update Console
+      win_shell: |
+        $Session = New-Object -ComObject Microsoft.Update.Session
+        $Searcher = $Session.CreateUpdateSearcher()
+        $Updates = $Searcher.Search("IsInstalled=0").Updates
+        $Downloader = $Session.CreateUpdateDownloader()
+        $Downloader.Updates = $Updates
+        $Downloader.Download()
+        $Installer = $Session.CreateUpdateInstaller()
+        $Installer.Updates = $Updates
+        $Result = $Installer.Install()
+      register: install_result
+
+    - name: Display Installed Updates
+      debug:
+        var: install_result
+
+    - name: Reboot Server if Required
+      win_reboot:
+        reboot_timeout: 1800
+      when: install_result is changed
