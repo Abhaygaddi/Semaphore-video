@@ -1,29 +1,12 @@
----
-- name: Connect to Windows 2016 Server via SSH and Log Result
-  hosts: 192.168.29.155
-  gather_facts: no
+- name: Create a file in C:\Temp on Windows Server
+  hosts: windows
   tasks:
-    - name: Check SSH connectivity
-      ansible.builtin.command: "whoami"
-      register: ssh_result
-      ignore_errors: yes
-
-    - name: Ensure log directory exists
-      ansible.builtin.file:
-        path: "C:\\ansible_logs"
+    - name: Ensure C:\Temp directory exists
+      win_file:
+        path: C:\Temp
         state: directory
-        mode: '0755'
 
-    - name: Log success
-      ansible.builtin.lineinfile:
-        path: "C:\\ansible_logs\\windows_ssh_log.txt"
-        line: "SUCCESS: {{ inventory_hostname }} connected successfully as {{ ssh_result.stdout }}"
-        create: yes
-      when: ssh_result.rc == 0
-
-    - name: Log failure
-      ansible.builtin.lineinfile:
-        path: "C:\\ansible_logs\\windows_ssh_log.txt"
-        line: "FAILURE: {{ inventory_hostname }} connection failed - {{ ssh_result.stderr }}"
-        create: yes
-      when: ssh_result.rc != 0
+    - name: Create a file in C:\Temp
+      win_file:
+        path: C:\Temp\example.txt
+        state: touch
