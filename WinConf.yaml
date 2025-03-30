@@ -1,12 +1,19 @@
-- name: Create a file in C:\Temp on Windows Server
+- name: Manage Windows Updates
   hosts: windows
   tasks:
-    - name: Ensure C:\Temp directory exists
-      win_file:
-        path: C:\Temp
-        state: directory
+    - name: Start Windows Update Service
+      win_service:
+        name: wuauserv
+        state: started
 
-    - name: Create a file in C:\Temp
-      win_file:
-        path: C:\Temp\example.txt
-        state: touch
+    - name: Search for available updates
+      win_updates:
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+        state: searched
+      register: update_result
+
+    - name: Display available updates
+      debug:
+        var: update_result.updates
