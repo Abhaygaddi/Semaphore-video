@@ -1,45 +1,30 @@
-- name: Enable, Start Windows Update Service, Check for Updates, and Install All Available Updates
-  hosts: windows
+---
+- name: Install all available updates and reboot Windows Server 2016
+  hosts: windows_servers
+  gather_facts: no
   tasks:
-    - name: Ensure Windows Update Service is Enabled
-      win_service:
-        name: wuauserv
-        start_mode: auto
+    - name: Ensure WinRM or SSH is configured
+      win_ping:
 
-    - name: Start Windows Update Service
-      win_service:
-        name: wuauserv
-        state: started
+    - name: Check and install all available updates
+      win_updates:
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+          - UpdateRollups
+          - Application
+          - Connectors
+          - DefinitionUpdates
+          - DeveloperKits
+          - FeaturePacks
+          - Guidance
+          - ServicePacks
+          - Tools
+          - UpdateRollups
+          - Updates
+        reboot: yes
+      register: update_result
 
-    - name: Install PSWindowsUpdate Module (if not installed)
-      win_shell: |
-        if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
-            Install-Module -Name PSWindowsUpdate -Force -SkipPublisherCheck
-        }
-      args:
-        executable: powershell.exe
-
-    - name: Check for All Available Windows Updates
-      win_shell: |
-        Import-Module PSWindowsUpdate
-        Get-WUList | Format-Table -AutoSize
-      args:
-        executable: powershell.exe
-      register: update_check_result
-
-    - name: Display Available Updates
+    - name: Display update results
       debug:
-        var: update_check_result.stdout_lines
-
-    - name: Install All Available Windows Updates Immediately
-      win_shell: |
-        Import-Module PSWindowsUpdate
-        Install-WindowsUpdate -AcceptAll -IgnoreReboot -AutoReboot
-      args:
-        executable: powershell.exe
-      register: install_result
-      changed_when: "'Installing updates' in install_result.stdout"
-
-    - name: Display Installed Updates
-      debug:
-        var: install_result.stdout_lines
+        var: update_result
