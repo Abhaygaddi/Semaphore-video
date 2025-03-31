@@ -1,6 +1,6 @@
 ---
-- name: Patch Windows Server 2016
-  hosts: WIN2016Client2
+- name: Install Updates on Windows Server 2016
+  hosts: all
   gather_facts: no
   tasks:
     - name: Ensure WinRM service is running
@@ -15,7 +15,10 @@
         state: started
         start_mode: auto
 
-    - name: Check for and Install All Available Windows Updates
+    - name: Check for and Install Windows Updates
       win_updates:
-        category_names: []  # Empty list installs all updates
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+          - UpdateRollups
         reboot: yes
