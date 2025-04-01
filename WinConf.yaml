@@ -1,21 +1,27 @@
 ---
-- name: Check and Install Updates on Windows Server 2016
-  hosts: all
-  gather_facts: no
+- hosts: windows_servers
+  gather_facts: false
+  become: yes
+  become_method: runas
+  become_user: Ansible
   tasks:
-    - name: Ensure WinRM service is running
-      win_service:
-        name: WinRM
-        state: started
-        start_mode: auto
+    - name: Ensure C:\temp directory exists
+      ansible.windows.win_file:
+        path: C:\temp
+        state: directory
+        mode: 0777
 
-    - name: Start Windows Update service
-      win_service:
-        name: wuauserv
-        state: started
-        start_mode: auto
-
-    - name: Check for and Install All Available Windows Updates
-      win_updates:
-        category_names: []  # Empty list installs all updates
+    - name: Install all available Windows updates
+      ansible.windows.win_updates:
+        category_names:
+          - CriticalUpdates
+          - SecurityUpdates
+          - FeaturePacks
+          - ProductUpdates
+          - UpdateRollups
+          - DefinitionUpdates
+          - Others
+        log_path: C:\temp\windows_update_log.txt
         reboot: yes
+        async: 1000
+        poll_interval: 10
