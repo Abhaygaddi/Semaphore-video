@@ -1,15 +1,27 @@
 ---
-- hosts: windows-machines
-  vars_files:
-   - /etc/ansible/group_vars/vault.yml
-  vars:
-    win_updates_categories:
-     - CriticalUpdates
-     - SecurityUpdates
-     - Updates
+- name: Check and Install Updates on Windows Server 2016
+  hosts: all
+  gather_facts: no
   tasks:
-  - name: checking for missing updates
-    win_updates:
-     state: installed
-     category_names: "{{ win_updates_categories }}"
-     register: update_count
+    - name: Ensure WinRM service is running
+      win_service:
+        name: WinRM
+        state: started
+        start_mode: auto
+
+    - name: Start Windows Update service
+      win_service:
+        name: wuauserv
+        state: started
+        start_mode: auto
+
+    - name: Check for Available Windows Updates
+      win_updates:
+        category_names: []  # Empty list installs all updates
+      register: update_result
+
+    - name: Install Updates and Reboot if Required
+      win_updates:
+        category_names: []
+        reboot: yes
+      when: update_result.found_update_count > 0
