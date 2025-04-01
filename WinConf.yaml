@@ -1,71 +1,65 @@
----
-# DESCRIPTION
-# Apply windows updates
+- name: Install all updates and reboot as many times as needed
+  ansible.windows.win_updates:
+    category_names: '*'
+    reboot: true
 
-- name: Apply windows updates
-  hosts: windows_systems
-  gather_facts: yes
+- name: Set a server alive interval during update stage for the ssh connection plugin
+  ansible.windows.win_updates:
+    category_names: '*'
+    reboot: true
   vars:
-    initial_reboot: |-
-      {{ 86400 <
-          (( ((ansible_date_time.date+" "+ansible_date_time.time)|to_datetime('%Y-%m-%d %H:%M:%S')) -
-              ansible_facts.lastboot|to_datetime('%Y-%m-%d %H:%M:%SZ')).total_seconds())|abs }}
+    # This can be set in a few ways, see the ssh connection plugin for more
+    # information. ControlMaster should be disabled to ensure the new timeout
+    # value is applied for this connection instead of through the cached
+    # connection.
+    ansible_ssh_args: -o ControlMaster=no -o ServerAliveInterval=30
 
-  tasks:
+- name: Install all security, critical, and rollup updates without a scheduled task
+  ansible.windows.win_updates:
+    category_names:
+      - SecurityUpdates
+      - CriticalUpdates
+      - UpdateRollups
+  become: true
+  become_method: runas
+  become_user: SYSTEM
 
-  # Reboot systems with if up longer then day
-  # this way we know that the system was able to come back
-  # up before updates were applied
-  - name: Reboot if system has a large uptime
-    win_reboot:
-    when: initial_reboot and not ansible_check_mode
-    tags:
-    - never
-    - reboot
+- name: Search-only, return list of found updates (if any), log to C:\ansible_wu.txt
+  ansible.windows.win_updates:
+    category_names: SecurityUpdates
+    state: searched
+    log_path: C:\ansible_wu.txt
 
-  - block:
-    - name: >
-        {{ 'Install' if 'install' in ansible_run_tags else 'Search' }} updates
-        {{ 'will automatically reboot' if 'reboot' in ansible_run_tags else 'no reboot' }}
-      win_updates:
-        category_names:
-          - SecurityUpdates
-          - CriticalUpdates
-          - UpdateRollups
-          - DefinitionUpdates
-          - Updates
-        reboot: "{{ 'yes' if 'reboot' in ansible_run_tags else 'no' }}"
-        state: "{{ 'installed' if 'install' in ansible_run_tags else 'searched' }}"
-      become: yes
-      become_method: runas
-      become_user: SYSTEM
-      register: update_results
-      tags:
-      - never
-      - install
-      - check
+- name: Install all security updates with automatic reboots
+  ansible.windows.win_updates:
+    category_names:
+      - SecurityUpdates
+    reboot: true
 
-    rescue:
-    - name: Windows update failed?
-      debug:
-        msg: "error: {{ update_results.msg }}"
-      when: update_results is failed and update_results.msg is defined
-      tags:
-      - always
-    - name: Server had pending reboots?
-      win_reboot:
-      when:  not ansible_check_mode and
-            update_results is failed and
-            update_results.msg is search('A reboot is required')
-      tags:
-      - never
-      - reboot
+- name: Install only particular updates based on the KB numbers
+  ansible.windows.win_updates:
+    category_names:
+      - SecurityUpdates
+    accept_list:
+      - KB5054006
+      - KB4103723
 
-    always:
-    - name: Report results
-      debug:
-        var: update_results
-      tags:
-      - never
-      - install
-      - check
+- name: Exclude updates based on the update title
+  ansible.windows.win_updates:
+    category_names:
+      - SecurityUpdates
+      - CriticalUpdates
+    reject_list:
+      - Windows Malicious Software Removal Tool for Windows
+      - \d{4}-\d{2} Cumulative Update for Windows Server 2016
+
+# Optionally, you can increase the reboot_timeout to survive long updates during reboot
+- name: Ensure we wait long enough for the updates to be applied during reboot
+  ansible.windows.win_updates:
+    reboot: true
+    reboot_timeout: 3600
+
+# Search and download Windows updates
+- name: Search and download Windows updates without installing them
+  ansible.windows.win_updates:
+    state: downloaded
