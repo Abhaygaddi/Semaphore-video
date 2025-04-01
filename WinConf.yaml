@@ -1,5 +1,5 @@
 ---
-- hosts: windows_servers
+- hosts: win2016Client2
   gather_facts: false
   become: yes
   become_method: runas
