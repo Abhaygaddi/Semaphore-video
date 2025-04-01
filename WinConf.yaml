@@ -1,27 +1,15 @@
 ---
-- hosts: WIN016Client2
-  gather_facts: false
-  become: yes
-  become_method: runas
-  become_user: Ansible
+- hosts: windows-machines
+  vars_files:
+   - /etc/ansible/group_vars/vault.yml
+  vars:
+    win_updates_categories:
+     - CriticalUpdates
+     - SecurityUpdates
+     - Updates
   tasks:
-    - name: Ensure C:\temp directory exists
-      ansible.windows.win_file:
-        path: C:\temp
-        state: directory
-        mode: 0777
-
-    - name: Install all available Windows updates
-      ansible.windows.win_updates:
-        category_names:
-          - CriticalUpdates
-          - SecurityUpdates
-          - FeaturePacks
-          - ProductUpdates
-          - UpdateRollups
-          - DefinitionUpdates
-          - Others
-        log_path: C:\temp\windows_update_log.txt
-        reboot: yes
-        async: 1000
-        poll_interval: 10
+  - name: checking for missing updates
+    win_updates:
+     state: installed
+     category_names: "{{ win_updates_categories }}"
+     register: update_count
