@@ -1,5 +1,5 @@
 ---
-- name: Install Updates on Windows Server 2016
+- name: Check and Install Updates on Windows Server 2016
   hosts: all
   gather_facts: no
   tasks:
@@ -15,10 +15,7 @@
         state: started
         start_mode: auto
 
-    - name: Check for and Install Windows Updates
+    - name: Check for and Install All Available Windows Updates
       win_updates:
-        category_names:
-          - SecurityUpdates
-          - CriticalUpdates
-          - UpdateRollups
+        category_names: []  # Empty list installs all updates
         reboot: yes
