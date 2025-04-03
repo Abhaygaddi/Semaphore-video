@@ -1,5 +1,5 @@
 ---
-- name: Check and Install Ready Updates on Windows Server 2016 (Without Task Scheduler)
+- name: Check and Install Updates on Windows Server 2016 (Without Task Scheduler)
   hosts: all
   gather_facts: no
   tasks:
@@ -20,23 +20,24 @@
         path: C:\temp
         state: directory
 
-    - name: Check for Updates Ready to Install
-      win_updates:
-        category_names: []  # Empty list checks for all updates
-        state: searched
-        use_task_scheduler: no  # Avoid using Task Scheduler
+    - name: Check for Available Updates
+      win_shell: |
+        $Updates = Get-WindowsUpdate -AcceptAll -IgnoreReboot
+        if ($Updates) { "Updates Available" } else { "No Updates Available" }
       register: update_check
 
-    - name: Install Ready Updates and Reboot if Required
-      win_updates:
-        category_names: []  # Empty list installs all updates
-        reboot: yes
-        use_task_scheduler: no  # Avoid using Task Scheduler
-      when: update_check.found_update_count > 0
+    - name: Install Updates if Available
+      win_shell: |
+        Install-WindowsUpdate -AcceptAll -IgnoreReboot -Verbose | Out-File -FilePath C:\temp\update_install.log
+      when: "'Updates Available' in update_check.stdout"
       register: update_result
       ignore_errors: yes
 
+    - name: Reboot Server if Updates Were Installed
+      win_reboot:
+      when: update_result is changed
+
     - name: Log Errors if Update Fails
       win_shell: |
-        "$((Get-Date).ToString()) - Windows Update Failed: {{ update_result.msg }}" | Out-File -FilePath C:\temp\update_errors.log -Append
-      when: update_result.failed_update_count > 0
+        "$((Get-Date).ToString()) - Windows Update Failed: {{ update_result.stderr }}" | Out-File -FilePath C:\temp\update_errors.log -Append
+      when: update_result.failed
