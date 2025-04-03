@@ -1,5 +1,5 @@
 ---
-- name: Check and Install Updates on Windows Server 2016
+- name: Check and Install Ready Updates on Windows Server 2016
   hosts: all
   gather_facts: no
   tasks:
@@ -20,13 +20,13 @@
         path: C:\temp
         state: directory
 
-    - name: Check for Available Updates
+    - name: Check for Updates Ready to Install
       win_updates:
         category_names: []  # Empty list checks for all updates
-        state: searched
+        state: installed
       register: update_check
 
-    - name: Install Available Updates and Reboot if Required
+    - name: Install Ready Updates and Reboot if Required
       win_updates:
         category_names: []  # Empty list installs all updates
         reboot: yes
