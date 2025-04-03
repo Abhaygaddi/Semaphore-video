@@ -1,0 +1,33 @@
+---
+- name: Install Updates on Windows Server 2019 and Log Errors
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Ensure WinRM service is running
+      win_service:
+        name: WinRM
+        state: started
+        start_mode: auto
+
+    - name: Start Windows Update service
+      win_service:
+        name: wuauserv
+        state: started
+        start_mode: auto
+
+    - name: Create Log Directory
+      win_file:
+        path: C:\temp
+        state: directory
+
+    - name: Install All Available Updates
+      win_updates:
+        category_names: []  # Empty list installs all updates
+        reboot: yes
+      register: update_result
+      ignore_errors: yes
+
+    - name: Log Errors if Update Fails
+      win_shell: |
+        "$((Get-Date).ToString()) - Windows Update Failed: {{ update_result.msg }}" | Out-File -FilePath C:\temp\update_errors.log -Append
+      when: update_result.failed_update_count > 0
