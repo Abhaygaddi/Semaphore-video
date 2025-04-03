@@ -1,0 +1,13 @@
+---
+- name: Check Disk Space on Windows Server 2016
+  hosts: windows
+  gather_facts: no
+  tasks:
+    - name: Get Disk Space Information
+      win_shell: |
+        Get-PSDrive -PSProvider FileSystem | Select-Object Name, @{Name='Used(GB)';Expression={[math]::Round($_.Used/1GB,2)}}, @{Name='Free(GB)';Expression={[math]::Round($_.Free/1GB,2)}}, @{Name='Total(GB)';Expression={[math]::Round($_.Used/1GB,2) + [math]::Round($_.Free/1GB,2)}} | ConvertTo-Json | Out-File -FilePath C:\temp\disk_space.json
+      register: disk_space
+
+    - name: Display Disk Space
+      debug:
+        msg: "{{ disk_space.stdout | from_json }}"
