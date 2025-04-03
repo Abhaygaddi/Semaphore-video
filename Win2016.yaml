@@ -1,5 +1,5 @@
 ---
-- name: Check and Install Ready Updates on Windows Server 2016
+- name: Check and Install Ready Updates on Windows Server 2016 (Without Task Scheduler)
   hosts: all
   gather_facts: no
   tasks:
@@ -23,13 +23,15 @@
     - name: Check for Updates Ready to Install
       win_updates:
         category_names: []  # Empty list checks for all updates
-        state: installed
+        state: searched
+        use_task_scheduler: no  # Avoid using Task Scheduler
       register: update_check
 
     - name: Install Ready Updates and Reboot if Required
       win_updates:
         category_names: []  # Empty list installs all updates
         reboot: yes
+        use_task_scheduler: no  # Avoid using Task Scheduler
       when: update_check.found_update_count > 0
       register: update_result
       ignore_errors: yes
