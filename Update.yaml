@@ -1,0 +1,24 @@
+---
+- name: Manually install Windows updates using PowerShell (No Scheduler)
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Create temp log folder
+      win_file:
+        path: C:\temp
+        state: directory
+
+    - name: Install PSWindowsUpdate module (if not present)
+      win_shell: |
+        if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
+            Install-Module -Name PSWindowsUpdate -Force -Scope AllUsers -Confirm:$false
+        }
+        Import-Module PSWindowsUpdate
+
+    - name: Run Windows Update
+      win_shell: |
+        Get-WindowsUpdate -AcceptAll -Install -IgnoreReboot | Out-File -FilePath C:\temp\win_update_log.txt -Append
+
+    - name: Reboot if needed
+      win_reboot:
+        reboot_timeout: 1800
