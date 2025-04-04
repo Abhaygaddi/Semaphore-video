@@ -1,23 +1,33 @@
 ---
-- name: Manually install Windows updates using PowerShell (No Scheduler)
+- name: Install all available updates on Windows Server
   hosts: all
   gather_facts: no
   tasks:
-    - name: Create temp log folder
+    - name: Ensure C:\temp exists
       win_file:
         path: C:\temp
         state: directory
 
-    - name: Install PSWindowsUpdate module (if not present)
+    - name: Install PSWindowsUpdate with NuGet fallback
       win_shell: |
+        Set-PSRepository -Name "PSGallery" -InstallationPolicy Trusted
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
+          Install-PackageProvider -Name NuGet -Force
+        }
         if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
-            Install-Module -Name PSWindowsUpdate -Force -Scope AllUsers -Confirm:$false
+          Install-Module -Name PSWindowsUpdate -Force
         }
         Import-Module PSWindowsUpdate
+      args:
+        executable: powershell.exe
 
     - name: Run Windows Update
       win_shell: |
-        Get-WindowsUpdate -AcceptAll -Install -IgnoreReboot | Out-File -FilePath C:\temp\win_update_log.txt -Append
+        Get-WindowsUpdate -AcceptAll -Install -IgnoreReboot |
+        Out-File -FilePath C:\temp\win_update_log.txt -Append
+      args:
+        executable: powershell.exe
 
     - name: Reboot if needed
       win_reboot:
