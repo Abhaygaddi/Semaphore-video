@@ -1,0 +1,27 @@
+---
+- name: Run Windows Update and reboot
+  hosts: all
+  vars_files:
+    - vars.json
+  tasks:
+    - name: Ensure Windows Update service is running
+      win_service:
+        name: "{{ update_service }}"
+        start_mode: auto
+        state: started
+
+    - name: Install all available updates
+      win_updates:
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+          - UpdateRollups
+        reboot: yes
+
+    - name: Reboot the machine if required
+      win_reboot:
+        reboot_timeout: "{{ reboot_timeout }}"
+        connect_timeout: 60
+        pre_reboot_delay: 15
+        post_reboot_delay: 60
+        test_command: 'echo WinRM is back!'
