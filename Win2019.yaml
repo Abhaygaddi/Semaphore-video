@@ -30,11 +30,6 @@
       register: search_result
       ignore_errors: yes
 
-    - name: Debug - Show Number of Updates Found
-      debug:
-        msg: "Updates found: {{ search_result.found_update_count }}"
-      when: search_result.found_update_count is defined
-
     - name: Log Search Summary
       win_shell: |
         "$((Get-Date).ToString()) - [Win2019] Update Check Completed. Updates Found: {{ search_result.found_update_count }}" | Out-File -FilePath C:\temp\update_check.log -Append
@@ -60,20 +55,20 @@
       win_shell: |
         "$((Get-Date).ToString()) - [Win2019] Installed Successfully: {{ item.value.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
       loop: "{{ update_result.updates | dict2items }}"
-      when: item.value.result == 'Succeeded'
+      when: item.value.installed == true
 
     - name: Log Failed Updates
       win_shell: |
         "$((Get-Date).ToString()) - [Win2019] Failed to Install: {{ item.value.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
       loop: "{{ update_result.updates | dict2items }}"
-      when: item.value.result == 'Failed'
+      when: item.value.installed == false
 
     - name: Log Errors if Update Fails
       win_shell: |
         "$((Get-Date).ToString()) - [Win2019] Windows Update Error: {{ update_result.msg }}" | Out-File -FilePath C:\temp\update_errors.log -Append
-      when: update_result.failed_update_count > 0
+      when: update_result.failed_update_count is defined and update_result.failed_update_count | int > 0
 
     - name: Reboot if Updates Require It
       win_reboot:
         reboot_timeout: 3600
-      when: update_result.reboot_required
+      when: update_result.reboot_required | default(false)
