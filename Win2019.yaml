@@ -1,7 +1,8 @@
 ---
-- name: Install Updates on Windows Server 2019 and Log Errors
+- name: Manually Check and Install Security and Critical Updates on Windows Server 2019
   hosts: all
   gather_facts: no
+
   tasks:
     - name: Ensure WinRM service is running
       win_service:
@@ -20,10 +21,22 @@
         path: C:\temp
         state: directory
 
-    - name: Install All Available Updates
+    - name: Manually Check for Security and Critical Updates
       win_updates:
-        category_names: []  # Empty list installs all updates
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+        state: searched  # Only search, don't install
+      register: search_result
+      ignore_errors: yes
+
+    - name: Install Security and Critical Updates
+      win_updates:
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
         reboot: yes
+      when: search_result.found_update_count > 0
       register: update_result
       ignore_errors: yes
 
