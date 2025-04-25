@@ -1,7 +1,8 @@
 ---
-- name: Check and Install Updates on Windows Server 2016 (Without Task Scheduler)
+- name: Manually Check and Install Security and Critical Updates on Windows Server 2016
   hosts: all
   gather_facts: no
+
   tasks:
     - name: Ensure WinRM service is running
       win_service:
@@ -20,24 +21,59 @@
         path: C:\temp
         state: directory
 
-    - name: Check for Available Updates
-      win_shell: |
-        $Updates = Get-WindowsUpdate -AcceptAll -IgnoreReboot
-        if ($Updates) { "Updates Available" } else { "No Updates Available" }
-      register: update_check
+    - name: Manually Check for Security and Critical Updates
+      win_updates:
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+        state: searched
+      register: search_result
+      ignore_errors: yes
 
-    - name: Install Updates if Available
+    - name: Debug - Show Number of Updates Found
+      debug:
+        msg: "Updates found: {{ search_result.found_update_count }}"
+      when: search_result.found_update_count is defined
+
+    - name: Log Search Summary
       win_shell: |
-        Install-WindowsUpdate -AcceptAll -IgnoreReboot -Verbose | Out-File -FilePath C:\temp\update_install.log
-      when: "'Updates Available' in update_check.stdout"
+        "$((Get-Date).ToString()) - [Win2016] Update Check Completed. Updates Found: {{ search_result.found_update_count }}" | Out-File -FilePath C:\temp\update_check.log -Append
+      when: search_result.found_update_count is defined
+
+    - name: Log Found Update Titles
+      win_shell: |
+        "$((Get-Date).ToString()) - [Win2016] Found Update: {{ item.title }}" | Out-File -FilePath C:\temp\update_check.log -Append
+      loop: "{{ search_result.updates }}"
+      when: search_result.updates is defined and search_result.found_update_count | int > 0
+
+    - name: Install Security and Critical Updates
+      win_updates:
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+        reboot: no
+      when: search_result.found_update_count | int > 0
       register: update_result
       ignore_errors: yes
 
-    - name: Reboot Server if Updates Were Installed
-      win_reboot:
-      when: update_result is changed
+    - name: Log Successfully Installed Updates
+      win_shell: |
+        "$((Get-Date).ToString()) - [Win2016] Installed Successfully: {{ item.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
+      loop: "{{ update_result.updates }}"
+      when: item.result == 'Succeeded'
+
+    - name: Log Failed Updates
+      win_shell: |
+        "$((Get-Date).ToString()) - [Win2016] Failed to Install: {{ item.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
+      loop: "{{ update_result.updates }}"
+      when: item.result == 'Failed'
 
     - name: Log Errors if Update Fails
       win_shell: |
-        "$((Get-Date).ToString()) - Windows Update Failed: {{ update_result.stderr }}" | Out-File -FilePath C:\temp\update_errors.log -Append
-      when: update_result.failed
+        "$((Get-Date).ToString()) - [Win2016] Windows Update Error: {{ update_result.msg }}" | Out-File -FilePath C:\temp\update_errors.log -Append
+      when: update_result.failed_update_count > 0
+
+    - name: Reboot if Updates Require It
+      win_reboot:
+        reboot_timeout: 3600
+      when: update_result.reboot_required
