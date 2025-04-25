@@ -26,9 +26,19 @@
         category_names:
           - SecurityUpdates
           - CriticalUpdates
-        state: searched  # Only search, don't install
+        state: searched
       register: search_result
       ignore_errors: yes
+
+    - name: Debug - Show Number of Updates Found
+      debug:
+        msg: "Updates found: {{ search_result.found_update_count }}"
+      when: search_result.found_update_count is defined
+
+    - name: Log Search Result
+      win_shell: |
+        "$((Get-Date).ToString()) - Update Check Completed. Updates Found: {{ search_result.found_update_count }}" | Out-File -FilePath C:\temp\update_check.log -Append
+      when: search_result.found_update_count is defined
 
     - name: Install Security and Critical Updates
       win_updates:
@@ -36,7 +46,7 @@
           - SecurityUpdates
           - CriticalUpdates
         reboot: yes
-      when: search_result.found_update_count > 0
+      when: search_result.found_update_count | int > 0
       register: update_result
       ignore_errors: yes
 
