@@ -35,22 +35,54 @@
         msg: "Updates found: {{ search_result.found_update_count }}"
       when: search_result.found_update_count is defined
 
-    - name: Log Search Result
+    - name: Log Search Summary
       win_shell: |
         "$((Get-Date).ToString()) - Update Check Completed. Updates Found: {{ search_result.found_update_count }}" | Out-File -FilePath C:\temp\update_check.log -Append
       when: search_result.found_update_count is defined
+
+    - name: Log Found Update Titles
+      win_shell: |
+        {% for update in search_result.updates %}
+        "$((Get-Date).ToString()) - Found Update: {{ update.title }}" | Out-File -FilePath C:\temp\update_check.log -Append
+        {% endfor %}
+      when: search_result.updates is defined and search_result.found_update_count | int > 0
+      delegate_to: localhost
+      run_once: true
 
     - name: Install Security and Critical Updates
       win_updates:
         category_names:
           - SecurityUpdates
           - CriticalUpdates
-        reboot: yes
+        reboot: no
       when: search_result.found_update_count | int > 0
       register: update_result
       ignore_errors: yes
 
+    - name: Log Successfully Installed Updates
+      win_shell: |
+        {% for update in update_result.updates if update.result == 'Succeeded' %}
+        "$((Get-Date).ToString()) - Installed Successfully: {{ update.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
+        {% endfor %}
+      when: update_result.updates is defined and update_result.updates | length > 0
+      delegate_to: localhost
+      run_once: true
+
+    - name: Log Failed Updates
+      win_shell: |
+        {% for update in update_result.updates if update.result == 'Failed' %}
+        "$((Get-Date).ToString()) - Failed to Install: {{ update.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
+        {% endfor %}
+      when: update_result.updates is defined and update_result.failed_update_count | int > 0
+      delegate_to: localhost
+      run_once: true
+
     - name: Log Errors if Update Fails
       win_shell: |
-        "$((Get-Date).ToString()) - Windows Update Failed: {{ update_result.msg }}" | Out-File -FilePath C:\temp\update_errors.log -Append
+        "$((Get-Date).ToString()) - Windows Update Error: {{ update_result.msg }}" | Out-File -FilePath C:\temp\update_errors.log -Append
       when: update_result.failed_update_count > 0
+
+    - name: Reboot if Updates Require It
+      win_reboot:
+        reboot_timeout: 3600
+      when: update_result.reboot_required
