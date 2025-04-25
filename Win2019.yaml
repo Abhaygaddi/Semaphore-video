@@ -1,5 +1,5 @@
 ---
-- name: Manually Check and Install Security and Critical Updates on Windows Server 2016
+- name: Manually Check and Install Security and Critical Updates on Windows Server 2019
   hosts: all
   gather_facts: no
 
@@ -37,12 +37,12 @@
 
     - name: Log Search Summary
       win_shell: |
-        "$((Get-Date).ToString()) - [Win2016] Update Check Completed. Updates Found: {{ search_result.found_update_count }}" | Out-File -FilePath C:\temp\update_check.log -Append
+        "$((Get-Date).ToString()) - [Win2019] Update Check Completed. Updates Found: {{ search_result.found_update_count }}" | Out-File -FilePath C:\temp\update_check.log -Append
       when: search_result.found_update_count is defined
 
     - name: Log Found Update Titles
       win_shell: |
-        "$((Get-Date).ToString()) - [Win2016] Found Update: {{ item.value.title }}" | Out-File -FilePath C:\temp\update_check.log -Append
+        "$((Get-Date).ToString()) - [Win2019] Found Update: {{ item.value.title }}" | Out-File -FilePath C:\temp\update_check.log -Append
       loop: "{{ search_result.updates | dict2items }}"
       when: search_result.updates is defined and search_result.found_update_count | int > 0
 
@@ -58,19 +58,19 @@
 
     - name: Log Successfully Installed Updates
       win_shell: |
-        "$((Get-Date).ToString()) - [Win2016] Installed Successfully: {{ item.value.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
+        "$((Get-Date).ToString()) - [Win2019] Installed Successfully: {{ item.value.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
       loop: "{{ update_result.updates | dict2items }}"
       when: item.value.result == 'Succeeded'
 
     - name: Log Failed Updates
       win_shell: |
-        "$((Get-Date).ToString()) - [Win2016] Failed to Install: {{ item.value.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
+        "$((Get-Date).ToString()) - [Win2019] Failed to Install: {{ item.value.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
       loop: "{{ update_result.updates | dict2items }}"
       when: item.value.result == 'Failed'
 
     - name: Log Errors if Update Fails
       win_shell: |
-        "$((Get-Date).ToString()) - [Win2016] Windows Update Error: {{ update_result.msg }}" | Out-File -FilePath C:\temp\update_errors.log -Append
+        "$((Get-Date).ToString()) - [Win2019] Windows Update Error: {{ update_result.msg }}" | Out-File -FilePath C:\temp\update_errors.log -Append
       when: update_result.failed_update_count > 0
 
     - name: Reboot if Updates Require It
