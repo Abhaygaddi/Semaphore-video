@@ -1,5 +1,5 @@
 ---
-- name: Manually Check and Install Security and Critical Updates on Windows Server 2019
+- name: Manually Check and Install Security and Critical Updates on Windows Server
   hosts: all
   gather_facts: no
 
@@ -46,8 +46,6 @@
         "$((Get-Date).ToString()) - Found Update: {{ update.title }}" | Out-File -FilePath C:\temp\update_check.log -Append
         {% endfor %}
       when: search_result.updates is defined and search_result.found_update_count | int > 0
-      delegate_to: localhost
-      run_once: true
 
     - name: Install Security and Critical Updates
       win_updates:
@@ -65,8 +63,6 @@
         "$((Get-Date).ToString()) - Installed Successfully: {{ update.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
         {% endfor %}
       when: update_result.updates is defined and update_result.updates | length > 0
-      delegate_to: localhost
-      run_once: true
 
     - name: Log Failed Updates
       win_shell: |
@@ -74,8 +70,6 @@
         "$((Get-Date).ToString()) - Failed to Install: {{ update.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
         {% endfor %}
       when: update_result.updates is defined and update_result.failed_update_count | int > 0
-      delegate_to: localhost
-      run_once: true
 
     - name: Log Errors if Update Fails
       win_shell: |
