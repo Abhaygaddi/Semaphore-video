@@ -42,9 +42,8 @@
 
     - name: Log Found Update Titles
       win_shell: |
-        {% for update in search_result.updates %}
-        "$((Get-Date).ToString()) - Found Update: {{ update.title }}" | Out-File -FilePath C:\temp\update_check.log -Append
-        {% endfor %}
+        "$((Get-Date).ToString()) - Found Update: {{ item.title }}" | Out-File -FilePath C:\temp\update_check.log -Append
+      loop: "{{ search_result.updates }}"
       when: search_result.updates is defined and search_result.found_update_count | int > 0
 
     - name: Install Security and Critical Updates
@@ -59,17 +58,15 @@
 
     - name: Log Successfully Installed Updates
       win_shell: |
-        {% for update in update_result.updates if update.result == 'Succeeded' %}
-        "$((Get-Date).ToString()) - Installed Successfully: {{ update.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
-        {% endfor %}
-      when: update_result.updates is defined and update_result.updates | length > 0
+        "$((Get-Date).ToString()) - Installed Successfully: {{ item.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
+      loop: "{{ update_result.updates }}"
+      when: item.result == 'Succeeded'
 
     - name: Log Failed Updates
       win_shell: |
-        {% for update in update_result.updates if update.result == 'Failed' %}
-        "$((Get-Date).ToString()) - Failed to Install: {{ update.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
-        {% endfor %}
-      when: update_result.updates is defined and update_result.failed_update_count | int > 0
+        "$((Get-Date).ToString()) - Failed to Install: {{ item.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
+      loop: "{{ update_result.updates }}"
+      when: item.result == 'Failed'
 
     - name: Log Errors if Update Fails
       win_shell: |
