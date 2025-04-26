@@ -1,27 +1,112 @@
----
-- name: Run Windows Update and reboot
-  hosts: all
-  vars_files:
-    - vars.json
-  tasks:
-    - name: Ensure Windows Update service is running
-      win_service:
-        name: "{{ update_service }}"
-        start_mode: auto
-        state: started
+$session = New-Object -ComObject Microsoft.Update.Session
+$searcher = $session.CreateUpdateSearcher()
+$searchResult = $searcher.Search("IsInstalled = 0")
 
-    - name: Install all available updates
-      win_updates:
-        category_names:
-          - SecurityUpdates
-          - CriticalUpdates
-          - UpdateRollups
-        reboot: yes
-
-    - name: Reboot the machine if required
-      win_reboot:
-        reboot_timeout: "{{ reboot_timeout }}"
-        connect_timeout: 60
-        pre_reboot_delay: 15
-        post_reboot_delay: 60
-        test_command: 'echo WinRM is back!'
+$searchResult.Updates | ForEach-Object -Process {
+    [PSCustomObject]@{
+        Title = $_.Title
+        AutoSelectOnWebSites = $_.AutoSelectOnWebSites
+        CanRequireSource = $_.CanRequireSource
+        Categories = $_.Categories | ForEach-Object -Process {
+            [PSCustomObject]@{
+                Name = $_.Name
+                CategoryID = $_.CategoryID
+                Description = $_.Descripiton
+                Type = $_.Type
+            }
+        }
+        Deadline = $_.Deadline
+        DeltaCompressedContentAvailable = $_.DeltaCompressedContentAvailable
+        DeltaCompressedContentPreferred = $_.DeltaCompressedContentPreferred
+        Description = $_.Description
+        EulaAccepted = $_.EulaAccepted
+        EulaText = $_.EulaText
+        HandlerID = $_.HandlerID
+        Image = $_.Image
+        InstallationBehavior = [PSCustomObject]@{
+            CanRequestUserInput = $_.InstallationBehavior.CanRequestUserInput
+            Impact = switch ($_.InstallationBehavior.Impact) {
+                0 { 'Normal' }
+                1 { 'Minor' }
+                2 { 'RequiresExclusiveHandling' }
+                default { $_ }
+            }
+            RebootBehavour = switch ($_.InstallationBehavior.RebootBehavior) {
+                0 { 'NeverReboots' }
+                1 { 'AlwaysRequiresReboot' }
+                2 { 'CanRequestReboot' }
+                default { $_ }
+            }
+            RequiresNetworkConnectivity = $_.InstallationBehavior.RequiresNetworkConnectivity
+        }
+        IsBeta = $_.IsBeta
+        IsDownloaded = $_.IsDownloaded
+        IsHidden = $_.IsHidden
+        IsInstalled = $_.IsInstalled
+        IsMandatory = $_.IsMandatory
+        IsUninstallable = $_.IsUninstallable
+        LastDeploymentChangeTime = $_.LastDeploymentChangeTime
+        MaxDownloadSize = $_.MaxDownloadSize
+        MinDownloadSize = $_.MinDownloadSize
+        MsrcSeverity = $_.MsrcSeverity
+        RecommendedCpuSpeed = $_.RecommendedCpuSpeed
+        RecommendedHardDiskSpace = $_.RecommendedHardDiskSpace
+        RecommendedMemory = $_.RecommendedMemory
+        ReleaseNotes = $_.ReleaseNotes
+        SupportUrl = $_.SupportUrl
+        Type = switch ($_.Type) {
+            1 { 'Software' }
+            2 { 'Driver' }
+            default { $_ }
+        }
+        UninstallationNotes = $_.UninstallationNotes
+        UninstallationBehavior = [PSCustomObject]@{
+            CanRequestUserInput = $_.UninstallationBehavior.CanRequestUserInput
+            Impact = switch ($_.UninstallationBehavior.Impact) {
+                0 { 'Normal' }
+                1 { 'Minor' }
+                2 { 'RequiresExclusiveHandling' }
+                default { $_ }
+            }
+            RebootBehavour = switch ($_.UninstallationBehavior.RebootBehavior) {
+                0 { 'NeverReboots' }
+                1 { 'AlwaysRequiresReboot' }
+                2 { 'CanRequestReboot' }
+                default { $_ }
+            }
+            RequiresNetworkConnectivity = $_.UninstallationBehavior.RequiresNetworkConnectivity
+        }
+        KBArticleIDs = $null
+        DeploymentAction = switch ($_.DeploymentAction) {
+            0 { 'None' }
+            1 { 'Installation' }
+            2 { 'Uninstallation' }
+            3 { 'Detection' }
+            default { $_ }
+        }
+        DownloadPriority = switch ($_.DownloadPriority) {
+            0 { 'Low' }
+            1 { 'Normal' }
+            2 { 'High' }
+            3 { 'ExtraHigh' }
+            default { $_ }
+        }
+        RebootRequired = $_.RebootRequired
+        IsPresent = $_.IsPresent
+        BrowseOwnly = $_.BrowseOwnly
+        PerUser = $_.PerUser
+        AutoSelection = switch ($_.AutoSelection) {
+            0 { 'LetWindowsUpdateDecide' }
+            1 { 'AutoSelectIfDownloaded' }
+            2 { 'NeverAutoSelect' }
+            3 { 'AlwaysAutoSelect' }
+            default { $_ }
+        }
+        AutoDownload = switch ($_.AutoDownload) {
+            0 { 'LetWindowsUpdateDecide' }
+            1 { 'NeverAutoDownload' }
+            2 { 'AlwaysAutoDownload' }
+            default { $_ }
+        }
+    }
+}
