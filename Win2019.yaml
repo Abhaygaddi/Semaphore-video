@@ -1,55 +1,74 @@
 ---
-- name: Install all Windows Updates on Windows Server
-  hosts: windows
+- name: Manage Windows Updates on Windows Server 2019
+  hosts: all
   gather_facts: no
-  become: false
 
   tasks:
+    - name: Ensure WinRM service is running
+      win_service:
+        name: WinRM
+        state: started
+        start_mode: auto
 
-    - name: Ensure PSWindowsUpdate module is installed
-      ansible.windows.win_shell: |
-        Install-PackageProvider -Name NuGet -Force
-        Install-Module -Name PSWindowsUpdate -Force -AllowClobber
-      args:
-        executable: powershell.exe
+    - name: Start Windows Update service
+      win_service:
+        name: wuauserv
+        state: started
+        start_mode: auto
+
+    - name: Create Log Directory
+      win_file:
+        path: C:\temp
+        state: directory
+
+    - name: Install PSWindowsUpdate module
+      win_shell: |
+        if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
+            Install-Module -Name PSWindowsUpdate -Force -SkipPublisherCheck
+        }
+      register: ps_update_module_installed
+      ignore_errors: yes
 
     - name: Create a scheduled task to run Windows Update as SYSTEM
       ansible.windows.win_scheduled_task:
-        name: ForceWindowsUpdate
-        description: Install all available updates automatically
-        actions:
-          - path: powershell.exe
-            arguments: "-ExecutionPolicy Bypass -Command \"Import-Module PSWindowsUpdate; Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath 'C:\\Temp\\ForceUpdateLog.txt'\""
-        triggers:
-          - type: once
-            start_boundary: "{{ lookup('pipe', \"powershell -Command \\\"(Get-Date).AddMinutes(1).ToString('yyyy-MM-ddTHH:mm:ss')\\\"\") }}"
-        username: SYSTEM
+        name: "Run Windows Update"
+        command: "powershell.exe -ExecutionPolicy Bypass -Command \"& {Start-Process powershell -ArgumentList '-NoProfile -Command Get-WindowsUpdate -Install'}"
+        user: SYSTEM
         state: present
+        trigger:
+          - type: daily
+            at: '03:00'
+        description: "This task runs Windows Update daily at 3 AM"
+        enabled: yes
 
-    - name: Run the scheduled task immediately
+    - name: Force Windows Update (by using PSWindowsUpdate)
       ansible.windows.win_shell: |
-        schtasks /Run /TN "ForceWindowsUpdate"
-      args:
-        executable: cmd.exe
+        Import-Module PSWindowsUpdate
+        Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\\Temp\\ForceUpdateLog.txt"
+      register: update_result
+      ignore_errors: yes
 
-    - name: Wait for updates to install (approx 20 minutes)
-      ansible.builtin.pause:
-        minutes: 20
+    - name: Log Update Results
+      win_shell: |
+        $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        $update_status = "{{ update_result.stdout }}"
+        "$timestamp - Update Results: $update_status" | Out-File -FilePath C:\temp\update_results.log -Append
 
-    - name: Check if reboot is required
-      ansible.windows.win_reboot:
-        reboot_timeout: 3600
-        test_command: 'powershell -Command "(Get-WmiObject -Class Win32_OperatingSystem).RebootRequired -eq $true"'
-      register: reboot_result
-      ignore_errors: true
+    - name: Reboot the server if necessary
+      win_reboot:
+        reboot_timeout: 600
+        test_command: whoami
+      when: update_result.stdout is search("requires a reboot")
+      register: reboot_status
 
-    - name: Reboot the server if required
-      ansible.windows.win_reboot:
-        reboot_timeout: 3600
-      when: reboot_result.changed
+    - name: Log Reboot Status
+      win_shell: |
+        $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        "$timestamp - Reboot status: {{ reboot_status }}" | Out-File -FilePath C:\temp\update_results.log -Append
+      when: reboot_status is defined
 
-    - name: Delete the scheduled task
-      ansible.windows.win_scheduled_task:
-        name: ForceWindowsUpdate
-        state: absent
-
+    - name: Log Errors if Update Fails
+      win_shell: |
+        $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        "$timestamp - Windows Update Failed: {{ update_result.msg }}" | Out-File -FilePath C:\temp\update_errors.log -Append
+      when: update_result.failed
