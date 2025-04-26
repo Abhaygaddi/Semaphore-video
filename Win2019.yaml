@@ -1,52 +1,63 @@
 ---
-- name: Windows 2019 Server Patch Management
-  hosts: your_windows_host  # Replace with your actual host or group
+- name: Fully Patch Windows Server 2019 (Clean + Reliable)
+  hosts: all
   gather_facts: no
-  collections:
-    - ansible.windows
-  tasks:
 
-    - name: Ensure C:\Temp directory exists
+  tasks:
+    - name: Create Temp Directory
       win_file:
         path: C:\Temp
         state: directory
 
-    - name: Install PSWindowsUpdate module if not already installed
+    - name: Stop Windows Update Services (Before Clearing Cache)
       win_shell: |
-        if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
-            Install-Module -Name PSWindowsUpdate -Force -Scope AllUsers
-        }
+        net stop wuauserv
+        net stop bits
       args:
         executable: powershell.exe
-
-    - name: Trigger Windows Update - Install all available updates
-      win_shell: |
-        Import-Module PSWindowsUpdate
-        Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot -Verbose | Tee-Object -FilePath "C:\Temp\WindowsUpdateInstallLog.txt"
-      args:
-        executable: powershell.exe
-      register: windows_update_result
       ignore_errors: yes
 
-    - name: Reboot if updates required
+    - name: Clear Windows Update Cache
+      win_shell: |
+        Remove-Item -Path "C:\Windows\SoftwareDistribution\*" -Recurse -Force
+      args:
+        executable: powershell.exe
+      ignore_errors: yes
+
+    - name: Start Windows Update Services (After Cache Clear)
+      win_shell: |
+        net start wuauserv
+        net start bits
+      args:
+        executable: powershell.exe
+      ignore_errors: yes
+
+    - name: Install NuGet Provider (Required for PSWindowsUpdate)
+      win_shell: |
+        Install-PackageProvider -Name NuGet -Force
+      args:
+        executable: powershell.exe
+
+    - name: Install PSWindowsUpdate Module
+      win_shell: |
+        Install-Module -Name PSWindowsUpdate -Force -Confirm:$false
+      args:
+        executable: powershell.exe
+
+    - name: Import PSWindowsUpdate Module
+      win_shell: |
+        Import-Module PSWindowsUpdate
+      args:
+        executable: powershell.exe
+
+    - name: Run Windows Update (Force Fresh Download)
+      win_shell: |
+        Import-Module PSWindowsUpdate
+        Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\Temp\ForceUpdateLog.txt"
+      args:
+        executable: powershell.exe
+      register: update_output
+
+    - name: Reboot if required (safety net)
       win_reboot:
-        reboot_timeout: 1800
-      when: windows_update_result.changed
-
-    - name: Gather installed patches after update
-      win_command: powershell.exe -Command "Get-HotFix | Select-Object -Property Description,HotFixID,InstalledOn | Format-Table -AutoSize"
-      register: installed_patches
-
-    - name: Write installed patches to a log file
-      win_copy:
-        content: |
-          Installed Patches as of {{ ansible_date_time.date }} {{ ansible_date_time.time }}
-
-          {% for line in installed_patches.stdout_lines %}
-          {{ line }}
-          {% endfor %}
-        dest: C:\Temp\InstalledPatchesLog.txt
-
-    - name: Display installed patches
-      debug:
-        var: installed_patches.stdout_lines
+        reboot_timeout: 3600
