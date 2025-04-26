@@ -1,46 +1,63 @@
 ---
-- name: Install All Available Updates on Windows Server 2019
+- name: Fully Patch Windows Server 2019 (Clean + Reliable)
   hosts: all
   gather_facts: no
 
   tasks:
-    - name: Ensure WinRM service is running
-      win_service:
-        name: WinRM
-        state: started
-        start_mode: auto
-
-    - name: Start Windows Update service
-      win_service:
-        name: wuauserv
-        state: started
-        start_mode: auto
-
-    - name: Create Log Directory
+    - name: Create Temp Directory
       win_file:
-        path: C:\temp
+        path: C:\Temp
         state: directory
 
-    - name: Install All Available Windows Updates
-      win_updates:
-        # No category_names filter = install all available updates
-        reboot: no
-        state: installed
-      register: update_result
+    - name: Stop Windows Update Services (Before Clearing Cache)
+      win_shell: |
+        net stop wuauserv
+        net stop bits
+      args:
+        executable: powershell.exe
       ignore_errors: yes
 
-    - name: Log Installed Updates
+    - name: Clear Windows Update Cache
       win_shell: |
-        "$((Get-Date).ToString()) - Installed: {{ item.value.title }} (KB{{ item.value.kb[0] | default('N/A') }}) - Status: {{ 'Success' if item.value.installed else 'FAILED' }}" | Out-File -FilePath C:\temp\update_install.log -Append
-      loop: "{{ update_result.updates | dict2items }}"
-      when: update_result.updates is defined
+        Remove-Item -Path "C:\Windows\SoftwareDistribution\*" -Recurse -Force
+      args:
+        executable: powershell.exe
+      ignore_errors: yes
 
-    - name: Log Update Errors
+    - name: Start Windows Update Services (After Cache Clear)
       win_shell: |
-        "$((Get-Date).ToString()) - Windows Update Error: {{ update_result.msg | default('No detailed error') }}" | Out-File -FilePath C:\temp\update_errors.log -Append
-      when: update_result.failed_update_count | default(0) | int > 0
+        net start wuauserv
+        net start bits
+      args:
+        executable: powershell.exe
+      ignore_errors: yes
 
-    - name: Reboot if Required After Updates
+    - name: Install NuGet Provider (Required for PSWindowsUpdate)
+      win_shell: |
+        Install-PackageProvider -Name NuGet -Force
+      args:
+        executable: powershell.exe
+
+    - name: Install PSWindowsUpdate Module
+      win_shell: |
+        Install-Module -Name PSWindowsUpdate -Force -Confirm:$false
+      args:
+        executable: powershell.exe
+
+    - name: Import PSWindowsUpdate Module
+      win_shell: |
+        Import-Module PSWindowsUpdate
+      args:
+        executable: powershell.exe
+
+    - name: Run Windows Update (Force Fresh Download)
+      win_shell: |
+        Import-Module PSWindowsUpdate
+        Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\Temp\ForceUpdateLog.txt"
+      args:
+        executable: powershell.exe
+      register: update_output
+
+    - name: Reboot if required (safety net)
       win_reboot:
         reboot_timeout: 3600
-      when: update_result.reboot_required | default(false)
