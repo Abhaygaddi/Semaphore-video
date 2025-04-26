@@ -1,27 +1,63 @@
-    - name: Create a one-time scheduled task to run Windows Update
-      ansible.windows.win_scheduled_task:
-        name: RunPSWindowsUpdate
-        description: Installs all updates via PSWindowsUpdate module
-        actions:
-          - path: powershell.exe
-            arguments: >
-              -ExecutionPolicy Bypass -WindowStyle Hidden -Command "Import-Module PSWindowsUpdate;
-              Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot |
-              Tee-Object -FilePath 'C:\Temp\ForceUpdateLog.txt'"
-        triggers:
-          - type: once
-            start_boundary: "{{ (ansible_date_time.iso8601 | to_datetime('%Y-%m-%dT%H:%M:%SZ') + timedelta(minutes=1)).isoformat() }}"
-        username: SYSTEM
-        run_level: highest
-        state: present
+---
+- name: Fully Patch Windows Server 2019 (Clean + Reliable)
+  hosts: all
+  gather_facts: no
 
-    - name: Run the scheduled update task immediately
-      ansible.windows.win_shell: schtasks /run /tn RunPSWindowsUpdate
+  tasks:
+    - name: Create Temp Directory
+      win_file:
+        path: C:\Temp
+        state: directory
 
-    - name: Wait 5 minutes for update task to run
-      ansible.builtin.pause:
-        minutes: 5
+    - name: Stop Windows Update Services (Before Clearing Cache)
+      win_shell: |
+        net stop wuauserv
+        net stop bits
+      args:
+        executable: powershell.exe
+      ignore_errors: yes
 
-    - name: Reboot if required
-      ansible.windows.win_reboot:
+    - name: Clear Windows Update Cache
+      win_shell: |
+        Remove-Item -Path "C:\Windows\SoftwareDistribution\*" -Recurse -Force
+      args:
+        executable: powershell.exe
+      ignore_errors: yes
+
+    - name: Start Windows Update Services (After Cache Clear)
+      win_shell: |
+        net start wuauserv
+        net start bits
+      args:
+        executable: powershell.exe
+      ignore_errors: yes
+
+    - name: Install NuGet Provider (Required for PSWindowsUpdate)
+      win_shell: |
+        Install-PackageProvider -Name NuGet -Force
+      args:
+        executable: powershell.exe
+
+    - name: Install PSWindowsUpdate Module
+      win_shell: |
+        Install-Module -Name PSWindowsUpdate -Force -Confirm:$false
+      args:
+        executable: powershell.exe
+
+    - name: Import PSWindowsUpdate Module
+      win_shell: |
+        Import-Module PSWindowsUpdate
+      args:
+        executable: powershell.exe
+
+    - name: Run Windows Update (Force Fresh Download)
+      win_shell: |
+        Import-Module PSWindowsUpdate
+        Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\Temp\ForceUpdateLog.txt"
+      args:
+        executable: powershell.exe
+      register: update_output
+
+    - name: Reboot if required (safety net)
+      win_reboot:
         reboot_timeout: 3600
