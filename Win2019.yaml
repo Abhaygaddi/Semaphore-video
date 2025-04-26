@@ -1,5 +1,5 @@
 ---
-- name: Search and Install Security and Critical Updates on Windows Server 2019
+- name: Install Security and Critical Updates on Windows Server 2019
   hosts: all
   gather_facts: no
 
@@ -21,50 +21,28 @@
         path: C:\temp
         state: directory
 
-    - name: Manually Check for Security and Critical Updates
-      win_updates:
-        category_names:
-          - SecurityUpdates
-          - CriticalUpdates
-        state: searched
-      register: search_result
-
-    - name: Log Update Search Result
-      win_shell: |
-        "$((Get-Date).ToString()) - [Win2019] Found {{ search_result.found_update_count }} updates. Reboot required: {{ search_result.reboot_required }}" | Out-File -FilePath C:\temp\update_check.log -Append
-
-    - name: Reboot after search if required before installing
-      win_reboot:
-        reboot_timeout: 1800
-      when: search_result.reboot_required | default(false)
-
-    - name: Install Security and Critical Updates
+    - name: Install Security and Critical Updates (one step)
       win_updates:
         category_names:
           - SecurityUpdates
           - CriticalUpdates
         reboot: no
+        state: installed
       register: update_result
-      when: search_result.found_update_count | int > 0
+      ignore_errors: yes
 
-    - name: Log Successfully Installed Updates
+    - name: Log Installed Updates
       win_shell: |
-        "$((Get-Date).ToString()) - [Win2019] Installed: {{ item.value.title }} (KB{{ item.value.kb[0] }})" | Out-File -FilePath C:\temp\update_install.log -Append
+        "$((Get-Date).ToString()) - Installed: {{ item.value.title }} (KB{{ item.value.kb[0] }}) - Status: {{ 'Success' if item.value.installed else 'FAILED' }}" | Out-File -FilePath C:\temp\update_install.log -Append
       loop: "{{ update_result.updates | dict2items }}"
-      when: item.value.installed == true
+      when: update_result.updates is defined
 
-    - name: Log Failed Updates
+    - name: Log Errors if Update Fails
       win_shell: |
-        "$((Get-Date).ToString()) - [Win2019] FAILED: {{ item.value.title }} (KB{{ item.value.kb[0] }})" | Out-File -FilePath C:\temp\update_install.log -Append
-      loop: "{{ update_result.updates | dict2items }}"
-      when: item.value.installed == false
-
-    - name: Log update errors
-      win_shell: |
-        "$((Get-Date).ToString()) - [Win2019] Update error: {{ update_result.msg }}" | Out-File -FilePath C:\temp\update_errors.log -Append
-      when: update_result.failed_update_count is defined and update_result.failed_update_count | int > 0
+        "$((Get-Date).ToString()) - Windows Update Error: {{ update_result.msg | default('No detailed error') }}" | Out-File -FilePath C:\temp\update_errors.log -Append
+      when: update_result.failed_update_count | default(0) | int > 0
 
     - name: Reboot if Updates Require It
       win_reboot:
-        reboot_timeout: 1800
+        reboot_timeout: 3600
       when: update_result.reboot_required | default(false)
