@@ -1,5 +1,5 @@
     - name: Create a one-time scheduled task to run Windows Update
-      win_scheduled_task:
+      ansible.windows.win_scheduled_task:
         name: RunPSWindowsUpdate
         description: Installs all updates via PSWindowsUpdate module
         actions:
@@ -16,14 +16,12 @@
         state: present
 
     - name: Run the scheduled update task immediately
-      win_shell: schtasks /run /tn RunPSWindowsUpdate
-      args:
-        executable: cmd.exe
+      ansible.windows.win_shell: schtasks /run /tn RunPSWindowsUpdate
 
     - name: Wait 5 minutes for update task to run
-      pause:
+      ansible.builtin.pause:
         minutes: 5
 
     - name: Reboot if required
-      win_reboot:
+      ansible.windows.win_reboot:
         reboot_timeout: 3600
