@@ -2,26 +2,30 @@
 - name: Windows Server Management Playbook
   hosts: your_windows_host  # Replace with your Windows host or IP address
   gather_facts: yes
+  collections:
+    - ansible.windows
   tasks:
 
     # Ensure WinRM service is running
     - name: Ensure WinRM service is running
-      ansible.windows.win_service:
+      win_service:
         name: WinRM
         state: started
 
     # Gather facts about the Windows services
     - name: Gather WinRM service facts
-      ansible.windows.win_service_facts:
+      win_service_info:
+        name: WinRM
+      register: winrm_service_info
 
     # Display the status of WinRM service
     - name: Display WinRM service status
       debug:
-        var: ansible_facts.services.WinRM.state
+        var: winrm_service_info.services[0].state
 
     # Run Windows Update and ensure all available updates are installed
     - name: Run Windows Update (Force Fresh Download)
-      ansible.windows.win_command: |
+      win_command: |
         Import-Module PSWindowsUpdate
         Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\\Temp\\ForceUpdateLog.txt"
       register: update_result
@@ -34,13 +38,13 @@
 
     # Reboot if necessary after update installation
     - name: Reboot system if required after updates
-      ansible.windows.win_reboot:
+      win_reboot:
         reboot_timeout: 600
       when: update_result.changed
 
     # Install all missing updates after reboot (if necessary)
     - name: Re-run Windows Update if new updates are found after reboot
-      ansible.windows.win_command: |
+      win_command: |
         Import-Module PSWindowsUpdate
         Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\\Temp\\ForceUpdateLog_SecondRun.txt"
       when: update_result.changed
@@ -54,7 +58,7 @@
 
     # Ensure the updates are installed properly
     - name: Verify updates installed correctly
-      ansible.windows.win_command: |
+      win_command: |
         Get-HotFix
       register: installed_hotfixes
 
