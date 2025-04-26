@@ -1,63 +1,58 @@
 ---
-- name: Fully Patch Windows Server 2019 (Clean + Reliable)
+- name: Force Windows Update on Windows Server 2019
   hosts: all
   gather_facts: no
-
   tasks:
-    - name: Create Temp Directory
-      win_file:
+
+    - name: Ensure WinRM is running
+      ansible.windows.win_service:
+        name: WinRM
+        start_mode: auto
+        state: started
+
+    - name: Ensure Windows Update service is running
+      ansible.windows.win_service:
+        name: wuauserv
+        start_mode: auto
+        state: started
+
+    - name: Create C:\Temp if not exists
+      ansible.windows.win_file:
         path: C:\Temp
         state: directory
 
-    - name: Stop Windows Update Services (Before Clearing Cache)
-      win_shell: |
-        net stop wuauserv
-        net stop bits
-      args:
-        executable: powershell.exe
-      ignore_errors: yes
+    - name: Create scheduled task to run Windows Update as SYSTEM
+      ansible.windows.win_scheduled_task:
+        name: ForceWindowsUpdate
+        description: Install updates silently via PSWindowsUpdate
+        actions:
+          - path: powershell.exe
+            arguments: >
+              -ExecutionPolicy Bypass -Command "Import-Module PSWindowsUpdate;
+              Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot |
+              Tee-Object -FilePath 'C:\Temp\ForceUpdateLog.txt'"
+        triggers:
+          - type: once
+            start_boundary: "{{ (ansible_date_time.iso8601 | to_datetime('%Y-%m-%dT%H:%M:%SZ') + timedelta(minutes=1)).isoformat() }}"
+        username: SYSTEM
+        run_level: highest
+        state: present
 
-    - name: Clear Windows Update Cache
-      win_shell: |
-        Remove-Item -Path "C:\Windows\SoftwareDistribution\*" -Recurse -Force
-      args:
-        executable: powershell.exe
-      ignore_errors: yes
+    - name: Run the scheduled task immediately
+      ansible.windows.win_shell: schtasks /run /tn ForceWindowsUpdate
 
-    - name: Start Windows Update Services (After Cache Clear)
-      win_shell: |
-        net start wuauserv
-        net start bits
-      args:
-        executable: powershell.exe
-      ignore_errors: yes
+    - name: Wait for updates to install (10 minutes)
+      ansible.builtin.pause:
+        minutes: 10
 
-    - name: Install NuGet Provider (Required for PSWindowsUpdate)
-      win_shell: |
-        Install-PackageProvider -Name NuGet -Force
-      args:
-        executable: powershell.exe
+    - name: Read the update log file
+      ansible.windows.win_shell: Get-Content -Path C:\Temp\ForceUpdateLog.txt
+      register: update_log
 
-    - name: Install PSWindowsUpdate Module
-      win_shell: |
-        Install-Module -Name PSWindowsUpdate -Force -Confirm:$false
-      args:
-        executable: powershell.exe
+    - name: Display Update Log
+      ansible.builtin.debug:
+        msg: "{{ update_log.stdout_lines }}"
 
-    - name: Import PSWindowsUpdate Module
-      win_shell: |
-        Import-Module PSWindowsUpdate
-      args:
-        executable: powershell.exe
-
-    - name: Run Windows Update (Force Fresh Download)
-      win_shell: |
-        Import-Module PSWindowsUpdate
-        Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\Temp\ForceUpdateLog.txt"
-      args:
-        executable: powershell.exe
-      register: update_output
-
-    - name: Reboot if required (safety net)
-      win_reboot:
+    - name: Reboot if required
+      ansible.windows.win_reboot:
         reboot_timeout: 3600
