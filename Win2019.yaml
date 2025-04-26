@@ -62,4 +62,3 @@
     - name: Display Installed Updates
       debug:
         var: installed_hotfixes.stdout_lines
-
