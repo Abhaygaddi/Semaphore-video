@@ -1,77 +1,55 @@
 ---
-- name: Run Windows Updates on Server 2019 using PSWindowsUpdate
-  hosts: all
+- name: Install all Windows Updates on Windows Server
+  hosts: windows
   gather_facts: no
-  become: yes
-  become_method: runas
-  vars:
-    update_log_path: "C:\\Temp\\ForceUpdateLog.txt"
-    update_script_path: "C:\\Temp\\RunWinUpdate.ps1"
-    task_name: "ForceWindowsUpdate"
-
-  collections:
-    - community.windows
+  become: false
 
   tasks:
+
     - name: Ensure PSWindowsUpdate module is installed
-      win_shell: |
+      ansible.windows.win_shell: |
         Install-PackageProvider -Name NuGet -Force
-        Set-PSRepository -Name "PSGallery" -InstallationPolicy Trusted
-        Install-Module -Name PSWindowsUpdate -Force
+        Install-Module -Name PSWindowsUpdate -Force -AllowClobber
       args:
         executable: powershell.exe
 
-    - name: Ensure log directory exists
-      win_file:
-        path: "C:\\Temp"
-        state: directory
-
-    - name: Create Windows Update PowerShell script
-      win_copy:
-        dest: "{{ update_script_path }}"
-        content: |
-          Import-Module PSWindowsUpdate
-          Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot |
-          Tee-Object -FilePath "{{ update_log_path }}"
-      vars:
-        ansible_shell_type: powershell
-
-    - name: Create scheduled task to run update script as SYSTEM
-      win_scheduled_task:
-        name: "{{ task_name }}"
-        description: "Force install all available Windows Updates"
+    - name: Create a scheduled task to run Windows Update as SYSTEM
+      ansible.windows.win_scheduled_task:
+        name: ForceWindowsUpdate
+        description: Install all available updates automatically
         actions:
           - path: powershell.exe
-            arguments: "-ExecutionPolicy Bypass -File {{ update_script_path }}"
-        run_level: highest
-        username: SYSTEM
-        state: present
-        one_time: true
+            arguments: "-ExecutionPolicy Bypass -Command \"Import-Module PSWindowsUpdate; Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath 'C:\\Temp\\ForceUpdateLog.txt'\""
         triggers:
           - type: once
-            start_boundary: "{{ lookup('pipe', 'powershell -Command \"(Get-Date).AddMinutes(1).ToString(\\'yyyy-MM-ddTHH:mm:ss\\')\"') }}"
+            start_boundary: "{{ lookup('pipe', \"powershell -Command \\\"(Get-Date).AddMinutes(1).ToString('yyyy-MM-ddTHH:mm:ss')\\\"\") }}"
+        username: SYSTEM
+        state: present
 
-    - name: Run scheduled task
-      win_scheduled_task:
-        name: "{{ task_name }}"
-        state: started
+    - name: Run the scheduled task immediately
+      ansible.windows.win_shell: |
+        schtasks /Run /TN "ForceWindowsUpdate"
+      args:
+        executable: cmd.exe
 
-    - name: Wait for update task to complete (pause 10 minutes)
-      pause:
-        minutes: 10
+    - name: Wait for updates to install (approx 20 minutes)
+      ansible.builtin.pause:
+        minutes: 20
 
-    - name: Reboot if pending
-      win_reboot:
-        reboot_timeout: 1800
-        connect_timeout: 30
-        msg: "Rebooting for updates to complete."
+    - name: Check if reboot is required
+      ansible.windows.win_reboot:
+        reboot_timeout: 3600
+        test_command: 'powershell -Command "(Get-WmiObject -Class Win32_OperatingSystem).RebootRequired -eq $true"'
       register: reboot_result
-      when: reboot_result is not defined or reboot_result.reboot_required
+      ignore_errors: true
 
-    - name: Fetch update log for verification
-      win_shell: Get-Content "{{ update_log_path }}"
-      register: update_log_output
+    - name: Reboot the server if required
+      ansible.windows.win_reboot:
+        reboot_timeout: 3600
+      when: reboot_result.changed
 
-    - name: Show update log output
-      debug:
-        msg: "{{ update_log_output.stdout_lines }}"
+    - name: Delete the scheduled task
+      ansible.windows.win_scheduled_task:
+        name: ForceWindowsUpdate
+        state: absent
+
