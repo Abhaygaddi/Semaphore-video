@@ -1,69 +1,92 @@
 ---
-- name: Manage Windows Server 2016
-  hosts: windows  # Replace with your host or group
+- name: Windows 2016 Server - Patch Management Playbook
+  hosts: windows
   gather_facts: yes
   tasks:
 
+    # Ensure WinRM service is running
     - name: Ensure WinRM service is running
-      win_service:
+      ansible.windows.win_service:
         name: WinRM
         state: started
 
-    - name: Gather Windows services facts (only)
-      setup:
+    # Gather Windows services facts
+    - name: Gather basic system facts
+      ansible.windows.setup:
         gather_subset:
           - services
 
+    # Display the status of WinRM service
     - name: Display WinRM service status
       debug:
         var: ansible_facts.services['WinRM'].state
 
-    - name: Ensure PSWindowsUpdate Module is installed
-      win_shell: |
-        if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
-          Install-PackageProvider -Name NuGet -Force
-          Install-Module -Name PSWindowsUpdate -Force
-        }
+    # Set TLS 1.2 to fix downloads
+    - name: Set TLS 1.2 for PowerShell
+      ansible.windows.win_shell: |
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+      register: tls_result
+      ignore_errors: yes
+
+    # Install NuGet provider
+    - name: Install NuGet Provider
+      ansible.windows.win_shell: |
+        Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
+      register: nuget_result
+      ignore_errors: yes
+
+    # Install PSWindowsUpdate Module
+    - name: Install PSWindowsUpdate Module
+      ansible.windows.win_shell: |
+        Install-Module -Name PSWindowsUpdate -Force -AllowClobber
       register: pswindowsupdate_install
       ignore_errors: yes
 
-    - name: Log PSWindowsUpdate Module installation result
+    # Log the result of PSWindowsUpdate Module installation
+    - name: Log PSWindowsUpdate Module Installation
       debug:
         var: pswindowsupdate_install.stdout_lines
 
+    # Run Windows Update (Force Fresh Download)
     - name: Run Windows Update (Force Fresh Download)
-      win_shell: |
+      ansible.windows.win_shell: |
         Import-Module PSWindowsUpdate
         Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\\Temp\\ForceUpdateLog.txt"
       register: update_result
       ignore_errors: yes
 
+    # Log the update result
     - name: Log Update Result
       debug:
         var: update_result
 
-    - name: Reboot system if required after updates
-      win_reboot:
+    # Reboot if necessary after update installation
+    - name: Reboot if required after updates
+      ansible.windows.win_reboot:
         reboot_timeout: 600
       when: update_result.changed
 
-    - name: Re-run Windows Update if new updates are found after reboot
-      win_shell: |
+    # After reboot, re-run Windows Update
+    - name: Run Windows Update again after reboot if needed
+      ansible.windows.win_shell: |
         Import-Module PSWindowsUpdate
         Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\\Temp\\ForceUpdateLog_SecondRun.txt"
       when: update_result.changed
       register: second_update_result
       ignore_errors: yes
 
+    # Log second update result
     - name: Log Second Update Result
       debug:
         var: second_update_result
 
-    - name: Verify updates installed correctly
-      win_shell: |
+    # Verify installed hotfixes
+    - name: Verify installed updates
+      ansible.windows.win_shell: |
         Get-HotFix
       register: installed_hotfixes
 
+    # Display installed updates
     - name: Display Installed Updates
       debug:
         var: installed_hotfixes.stdout_lines
