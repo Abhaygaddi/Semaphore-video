@@ -1,92 +1,46 @@
 ---
-- name: Windows 2016 Server - Patch Management Playbook
-  hosts: windows
-  gather_facts: yes
-  tasks:
+- name: Install All Available Updates on Windows Server 2016
+  hosts: all
+  gather_facts: no
 
-    # Ensure WinRM service is running
+  tasks:
     - name: Ensure WinRM service is running
-      ansible.windows.win_service:
+      win_service:
         name: WinRM
         state: started
+        start_mode: auto
 
-    # Gather Windows services facts
-    - name: Gather basic system facts
-      ansible.windows.setup:
-        gather_subset:
-          - services
+    - name: Start Windows Update service
+      win_service:
+        name: wuauserv
+        state: started
+        start_mode: auto
 
-    # Display the status of WinRM service
-    - name: Display WinRM service status
-      debug:
-        var: ansible_facts.services['WinRM'].state
+    - name: Create Log Directory
+      win_file:
+        path: C:\temp
+        state: directory
 
-    # Set TLS 1.2 to fix downloads
-    - name: Set TLS 1.2 for PowerShell
-      ansible.windows.win_shell: |
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-      register: tls_result
-      ignore_errors: yes
-
-    # Install NuGet provider
-    - name: Install NuGet Provider
-      ansible.windows.win_shell: |
-        Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
-      register: nuget_result
-      ignore_errors: yes
-
-    # Install PSWindowsUpdate Module
-    - name: Install PSWindowsUpdate Module
-      ansible.windows.win_shell: |
-        Install-Module -Name PSWindowsUpdate -Force -AllowClobber
-      register: pswindowsupdate_install
-      ignore_errors: yes
-
-    # Log the result of PSWindowsUpdate Module installation
-    - name: Log PSWindowsUpdate Module Installation
-      debug:
-        var: pswindowsupdate_install.stdout_lines
-
-    # Run Windows Update (Force Fresh Download)
-    - name: Run Windows Update (Force Fresh Download)
-      ansible.windows.win_shell: |
-        Import-Module PSWindowsUpdate
-        Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\\Temp\\ForceUpdateLog.txt"
+    - name: Install All Available Windows Updates
+      win_updates:
+        # No category_names filter = install all available updates
+        reboot: no
+        state: installed
       register: update_result
       ignore_errors: yes
 
-    # Log the update result
-    - name: Log Update Result
-      debug:
-        var: update_result
+    - name: Log Installed Updates
+      win_shell: |
+        "$((Get-Date).ToString()) - Installed: {{ item.value.title }} (KB{{ item.value.kb[0] | default('N/A') }}) - Status: {{ 'Success' if item.value.installed else 'FAILED' }}" | Out-File -FilePath C:\temp\update_install.log -Append
+      loop: "{{ update_result.updates | dict2items }}"
+      when: update_result.updates is defined
 
-    # Reboot if necessary after update installation
-    - name: Reboot if required after updates
-      ansible.windows.win_reboot:
-        reboot_timeout: 600
-      when: update_result.changed
+    - name: Log Update Errors
+      win_shell: |
+        "$((Get-Date).ToString()) - Windows Update Error: {{ update_result.msg | default('No detailed error') }}" | Out-File -FilePath C:\temp\update_errors.log -Append
+      when: update_result.failed_update_count | default(0) | int > 0
 
-    # After reboot, re-run Windows Update
-    - name: Run Windows Update again after reboot if needed
-      ansible.windows.win_shell: |
-        Import-Module PSWindowsUpdate
-        Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\\Temp\\ForceUpdateLog_SecondRun.txt"
-      when: update_result.changed
-      register: second_update_result
-      ignore_errors: yes
-
-    # Log second update result
-    - name: Log Second Update Result
-      debug:
-        var: second_update_result
-
-    # Verify installed hotfixes
-    - name: Verify installed updates
-      ansible.windows.win_shell: |
-        Get-HotFix
-      register: installed_hotfixes
-
-    # Display installed updates
-    - name: Display Installed Updates
-      debug:
-        var: installed_hotfixes.stdout_lines
+    - name: Reboot if Required After Updates
+      win_reboot:
+        reboot_timeout: 3600
+      when: update_result.reboot_required | default(false)
