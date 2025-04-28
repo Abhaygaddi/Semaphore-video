@@ -1,6 +1,6 @@
 ---
 - name: Manage Windows Server 2016
-  hosts: your_windows_host  # Replace with your host or group
+  hosts: windows  # Replace with your host or group
   gather_facts: yes
   tasks:
 
