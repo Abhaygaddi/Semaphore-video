@@ -1,79 +1,64 @@
 ---
-- name: Manually Check and Install Security and Critical Updates on Windows Server 2016
-  hosts: all
-  gather_facts: no
-
+- name: Windows Server Management Playbook
+  hosts: your_windows_host  # Replace with your Windows host or IP address
+  gather_facts: yes
   tasks:
+
+    # Ensure WinRM service is running
     - name: Ensure WinRM service is running
-      win_service:
+      ansible.windows.win_service:
         name: WinRM
         state: started
-        start_mode: auto
 
-    - name: Start Windows Update service
-      win_service:
-        name: wuauserv
-        state: started
-        start_mode: auto
+    # Gather facts about the Windows services
+    - name: Gather WinRM service facts
+      ansible.windows.win_service_facts:
 
-    - name: Create Log Directory
-      win_file:
-        path: C:\temp
-        state: directory
-
-    - name: Manually Check for Security and Critical Updates
-      win_updates:
-        category_names:
-          - SecurityUpdates
-          - CriticalUpdates
-        state: searched
-      register: search_result
-      ignore_errors: yes
-
-    - name: Debug - Show Number of Updates Found
+    # Display the status of WinRM service
+    - name: Display WinRM service status
       debug:
-        msg: "Updates found: {{ search_result.found_update_count }}"
-      when: search_result.found_update_count is defined
+        var: ansible_facts.services.WinRM.state
 
-    - name: Log Search Summary
-      win_shell: |
-        "$((Get-Date).ToString()) - [Win2016] Update Check Completed. Updates Found: {{ search_result.found_update_count }}" | Out-File -FilePath C:\temp\update_check.log -Append
-      when: search_result.found_update_count is defined
-
-    - name: Log Found Update Titles
-      win_shell: |
-        "$((Get-Date).ToString()) - [Win2016] Found Update: {{ item.title }}" | Out-File -FilePath C:\temp\update_check.log -Append
-      loop: "{{ search_result.updates }}"
-      when: search_result.updates is defined and search_result.found_update_count | int > 0
-
-    - name: Install Security and Critical Updates
-      win_updates:
-        category_names:
-          - SecurityUpdates
-          - CriticalUpdates
-        reboot: no
-      when: search_result.found_update_count | int > 0
+    # Run Windows Update and ensure all available updates are installed
+    - name: Run Windows Update (Force Fresh Download)
+      ansible.windows.win_command: |
+        Import-Module PSWindowsUpdate
+        Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\\Temp\\ForceUpdateLog.txt"
       register: update_result
       ignore_errors: yes
 
-    - name: Log Successfully Installed Updates
-      win_shell: |
-        "$((Get-Date).ToString()) - [Win2016] Installed Successfully: {{ item.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
-      loop: "{{ update_result.updates }}"
-      when: item.result == 'Succeeded'
+    # Log the update result
+    - name: Log Update Result
+      debug:
+        var: update_result
 
-    - name: Log Failed Updates
-      win_shell: |
-        "$((Get-Date).ToString()) - [Win2016] Failed to Install: {{ item.title }}" | Out-File -FilePath C:\temp\update_install.log -Append
-      loop: "{{ update_result.updates }}"
-      when: item.result == 'Failed'
+    # Reboot if necessary after update installation
+    - name: Reboot system if required after updates
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
+      when: update_result.changed
 
-    - name: Log Errors if Update Fails
-      win_shell: |
-        "$((Get-Date).ToString()) - [Win2016] Windows Update Error: {{ update_result.msg }}" | Out-File -FilePath C:\temp\update_errors.log -Append
-      when: update_result.failed_update_count > 0
+    # Install all missing updates after reboot (if necessary)
+    - name: Re-run Windows Update if new updates are found after reboot
+      ansible.windows.win_command: |
+        Import-Module PSWindowsUpdate
+        Get-WindowsUpdate -AcceptAll -Install -ForceDownload -IgnoreReboot | Tee-Object -FilePath "C:\\Temp\\ForceUpdateLog_SecondRun.txt"
+      when: update_result.changed
+      register: second_update_result
+      ignore_errors: yes
 
-    - name: Reboot if Updates Require It
-      win_reboot:
-        reboot_timeout: 3600
-      when: update_result.reboot_required
+    # Log the second update result after reboot
+    - name: Log Second Update Result
+      debug:
+        var: second_update_result
+
+    # Ensure the updates are installed properly
+    - name: Verify updates installed correctly
+      ansible.windows.win_command: |
+        Get-HotFix
+      register: installed_hotfixes
+
+    # Display the list of installed updates
+    - name: Display Installed Updates
+      debug:
+        var: installed_hotfixes.stdout_lines
