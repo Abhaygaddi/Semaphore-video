@@ -1,6 +1,6 @@
 ---
 - name: Manage Windows Server 2016
-  hosts: your_windows_host  # <-- Replace with your host or group name
+  hosts: your_windows_host  # Replace with your host or group
   gather_facts: yes
   tasks:
 
@@ -9,12 +9,14 @@
         name: WinRM
         state: started
 
-    - name: Gather WinRM service facts
-      win_service_facts:
+    - name: Gather Windows services facts (only)
+      setup:
+        gather_subset:
+          - services
 
     - name: Display WinRM service status
       debug:
-        var: ansible_facts.services.WinRM.state
+        var: ansible_facts.services['WinRM'].state
 
     - name: Ensure PSWindowsUpdate Module is installed
       win_shell: |
