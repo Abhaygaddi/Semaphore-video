@@ -1,54 +1,23 @@
----
-- name: Install patch from network share as SYSTEM via Scheduled Task
-  hosts: WIN2016
-  gather_facts: no
-  vars:
-    samba_share_path: "\\\\192.168.29.78\\winpatches"
-    patch_filename: "KB5058921.msu"
-    samba_user: "smbuser"
-    samba_password: "0pT1mus9r1me#"
-    task_name: "RunPatchTask"
-    task_time: "23:59"  # A valid future time
+- name: Ensure patch folder exists
+  ansible.windows.win_file:
+    path: C:\Temp\patches
+    state: directory
 
-  tasks:
+- name: Map share and copy patch locally
+  ansible.windows.win_command: >
+    cmd.exe /c net use {{ samba_share_path }} {{ samba_password }} /user:{{ samba_user }} &&
+    copy {{ samba_share_path }}\\{{ patch_filename }} C:\\Temp\\patches\\ /Y
+  register: copy_patch
+  changed_when: "'1 file(s) copied' in copy_patch.stdout"
 
-    - name: Map network share using Samba credentials
-      ansible.windows.win_command: >
-        cmd.exe /c net use {{ samba_share_path }} {{ samba_password }} /user:{{ samba_user }}
-      register: map_result
-      changed_when: "'The command completed successfully.' in map_result.stdout"
+- name: Create task to install patch locally as SYSTEM
+  ansible.windows.win_command: >
+    schtasks /Create /TN {{ task_name }} /TR "wusa C:\\Temp\\patches\\{{ patch_filename }} /quiet /norestart" /SC ONCE /ST {{ task_time }} /RL HIGHEST /RU SYSTEM
 
-    - name: Create scheduled task to run patch as SYSTEM
-      ansible.windows.win_command: >
-        schtasks /Create /TN {{ task_name }} /TR "wusa {{ samba_share_path }}\\{{ patch_filename }} /quiet /norestart" /SC ONCE /ST {{ task_time }} /RL HIGHEST /RU SYSTEM
-      register: create_task
-      failed_when: "'ERROR' in create_task.stdout"
+- name: Run the task
+  ansible.windows.win_command: >
+    schtasks /Run /TN {{ task_name }}
 
-    - name: Force the task to run immediately
-      ansible.windows.win_command: >
-        schtasks /Run /TN {{ task_name }}
-      register: run_task
-
-    - name: Wait for the task to complete
-      pause:
-        seconds: 90
-
-    - name: Check if the patch is installed
-      ansible.windows.win_command: powershell.exe Get-HotFix -Id KB5058921
-      register: patch_check
-      failed_when: false
-
-    - name: Show patch installation status
-      debug:
-        msg: "{{ patch_check.stdout if patch_check.stdout else 'Patch not found. Possibly failed.' }}"
-
-    - name: Delete scheduled task
-      ansible.windows.win_command: >
-        schtasks /Delete /TN {{ task_name }} /F
-      register: delete_task
-
-    - name: Unmap network share
-      ansible.windows.win_command: >
-        cmd.exe /c net use {{ samba_share_path }} /delete
-      register: unmap_result
-      failed_when: false
+- name: Wait and check if patch installed
+  pause:
+    seconds: 90
