@@ -1,12 +1,12 @@
 - name: Install patch from network share via scheduled task as domain user and reboot
-  hosts: windows_servers
+  hosts: WIN2016
   gather_facts: no
   vars:
     samba_share_path: "\\\\192.168.29.78\\winpatches"
     patch_filename: "KB5058921.msu"
     samba_user: "smbuser"
     samba_password: "0pT1mus9r1me#"
-    domain_user: "testdc\\ansible"
+    domain_user: "testdc\ansible"
     domain_password: "0pT1mus9r1me#"
     task_name: "RunPatchAsDomainUser"
     task_time: "23:59"  # Adjust to one or two minutes ahead of current time
