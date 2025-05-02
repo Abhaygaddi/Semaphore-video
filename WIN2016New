@@ -44,5 +44,5 @@
       when: patch_result.rc == 3010
 
     - name: Remove the mapped network drive
-      win_command: net use Z: /delete
+      win_command: "net use Z: /delete"
       ignore_errors: yes
