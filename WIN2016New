@@ -1,4 +1,4 @@
-- name: Install patch from network share via scheduled task as domain user and reboot
+- name: Install patch from network share via scheduled task as domain user
   hosts: WIN2016
   gather_facts: no
   vars:
@@ -9,7 +9,7 @@
     domain_user: "testdc\\ansible"
     domain_password: "0pT1mus9r1me#"
     task_name: "RunPatchAsDomainUser"
-    task_time: "23:59"  # Adjust to one or two minutes ahead of current time
+    task_time: "23:59"  # change to a minute or two ahead of current time
 
   tasks:
     - name: Map network share using Samba credentials
@@ -29,8 +29,3 @@
     - name: Wait for patch installation to complete
       pause:
         seconds: 90
-
-    - name: Reboot the server
-      ansible.windows.win_reboot:
-        reboot_timeout: 600
-        test_command: 'powershell -Command "Get-HotFix -Id KB5058921"'
