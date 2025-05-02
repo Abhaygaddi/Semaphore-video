@@ -1,13 +1,11 @@
 ---
-- name: Install Specific Patch from Linux Samba Share on Windows Server 2016
+- name: Install Specific Patch Directly from Linux Samba Share on Windows Server 2016
   hosts: all
   gather_facts: no
 
   vars:
     patch_kb: KB5058921
-    patch_file: KB5058921.msu
     patch_share_path: "\\\\<192.168.29.78>\\winpatches\\KB5058921.msu"
-    local_patch_path: "C:\\Temp\\KB5058921.msu"
 
   tasks:
     - name: Ensure WinRM service is running
@@ -27,15 +25,9 @@
         path: C:\temp
         state: directory
 
-    - name: Copy patch from Samba share to local disk
+    - name: Install patch directly from network share
       win_command: >
-        cmd.exe /c copy {{ patch_share_path }} {{ local_patch_path }}
-      args:
-        creates: "{{ local_patch_path }}"
-
-    - name: Install specific patch
-      win_command: >
-        wusa.exe {{ local_patch_path }} /quiet /norestart
+        wusa.exe {{ patch_share_path }} /quiet /norestart
       register: patch_install
       ignore_errors: yes
 
@@ -47,4 +39,4 @@
     - name: Reboot if Required
       win_reboot:
         reboot_timeout: 3600
-      when: patch_install.rc == 3010  # 3010 = success + reboot required
+      when: patch_install.rc == 3010
