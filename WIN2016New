@@ -1,5 +1,5 @@
 ---
-- name: Install Patch from Samba Share with Domain User Credentials
+- name: Install Windows Patch from UNC Path (No Drive Mapping)
   hosts: all
   gather_facts: no
 
@@ -10,8 +10,7 @@
     samba_share: winpatches
     samba_user: smbuser
     samba_password: "0pT1mus9r1me#"
-    mapped_drive: "Z:"
-    unc_patch_path: "\\\\{{ samba_server }}\\{{ samba_share }}\\{{ patch_file }}"
+    unc_patch_path: "\\{{ samba_server }}\{{ samba_share }}\{{ patch_file }}"
 
   tasks:
     - name: Ensure WinRM is running
@@ -25,34 +24,21 @@
         path: C:\temp
         state: directory
 
-    - name: Clear any existing connection to the Samba server
-      win_command: net use \\{{ samba_server }} /delete
-      ignore_errors: yes
-
-    - name: Map Samba share with domain credentials
+    - name: Authenticate to the Samba share (without drive mapping)
       win_command: >
-        net use {{ mapped_drive }} \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_user }} "{{ samba_password }}"
-      register: map_result
+        net use \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_user }} "{{ samba_password }}"
+      register: auth_result
       ignore_errors: no
 
-    - name: Verify that the network drive is mapped
-      win_command: dir {{ mapped_drive }}
-      register: dir_result
-      failed_when: dir_result.rc != 0
-      ignore_errors: yes
-
-    - name: Install patch directly from network share
+    - name: Install patch directly from UNC path
       win_command: >
-        wusa.exe {{ unc_patch_path }} /quiet /norestart
+        wusa.exe "{{ unc_patch_path }}" /quiet /norestart
       register: patch_result
       ignore_errors: yes
 
-    - name: Check if patch installed successfully
-      debug:
-        msg: "Patch install result: {{ patch_result.stdout }}"
-
-    - name: Unmap the network drive after patch installation
-      win_command: net use {{ mapped_drive }} /delete
+    - name: Disconnect from Samba share after installation
+      win_command: >
+        net use \\{{ samba_server }}\{{ samba_share }} /delete
       ignore_errors: yes
 
     - name: Log patch install result
@@ -60,8 +46,7 @@
         "$((Get-Date).ToString()) - Patch {{ patch_kb }} Install Status: {{ 'Success' if patch_result.rc == 0 else 'FAILED' }}" |
         Out-File -FilePath C:\temp\{{ patch_kb }}_install.log -Append
 
-    - name: Reboot the system if the patch requires it
+    - name: Reboot the system if patch requires it
       win_reboot:
         reboot_timeout: 3600
       when: patch_result.rc == 3010
-      ignore_errors: yes
