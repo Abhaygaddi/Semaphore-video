@@ -1,5 +1,5 @@
 ---
-- name: Install Windows Patch from UNC Path using Scheduled Task
+- name: Install Windows Patch from UNC Path using Scheduled Task with Reboot
   hosts: all
   gather_facts: no
 
@@ -63,3 +63,12 @@
       win_shell: |
         "$((Get-Date).ToString()) - Patch {{ patch_kb }} install task triggered from UNC path." |
         Out-File -FilePath C:\temp\{{ patch_kb }}_install.log -Append
+
+    - name: Check if reboot is required after patch install
+      win_command: shutdown /r /f /t 0
+      when: ansible_facts['reboot_required'] | default(false)
+
+    - name: Reboot the server if required
+      win_reboot:
+        reboot_timeout: 600
+      when: ansible_facts['reboot_required'] | default(false)
