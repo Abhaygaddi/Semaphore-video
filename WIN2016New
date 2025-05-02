@@ -1,6 +1,6 @@
 ---
 - name: Install Patch KB5058921 on Windows Server
-  hosts: win2016
+  hosts: WIN2016
   tasks:
     - name: Map Samba share with domain credentials
       ansible.windows.win_command:
