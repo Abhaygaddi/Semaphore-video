@@ -1,5 +1,5 @@
 ---
-- name: Install Patch from Linux Samba Share
+- name: Install Patch from Linux Samba Share with Clean Mapping
   hosts: all
   gather_facts: no
 
@@ -9,7 +9,7 @@
     samba_server: 192.168.29.78
     samba_share: winpatches
     samba_user: smbuser
-    samba_password: 0pT1mus9r1me#  # 🔐 Best to pass this via Ansible Vault
+    samba_password: "0pT1mus9r1me#"
     unc_patch_path: "\\\\{{ samba_server }}\\{{ samba_share }}\\{{ patch_file }}"
 
   tasks:
@@ -24,9 +24,13 @@
         path: C:\temp
         state: directory
 
-    - name: Map network share with credentials
+    - name: Clear any existing connection to the Samba server
+      win_command: net use \\{{ samba_server }} /delete
+      ignore_errors: yes
+
+    - name: Map Samba share with full user format
       win_command: >
-        net use \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_user }} "{{ samba_password }}"
+        net use \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_server }}\{{ samba_user }} "{{ samba_password }}"
       register: map_result
       ignore_errors: no
 
@@ -36,9 +40,8 @@
       register: patch_result
       ignore_errors: yes
 
-    - name: Unmap network share
-      win_command: >
-        net use \\{{ samba_server }}\{{ samba_share }} /delete
+    - name: Unmap Samba share
+      win_command: net use \\{{ samba_server }}\{{ samba_share }} /delete
       ignore_errors: yes
 
     - name: Log patch install result
