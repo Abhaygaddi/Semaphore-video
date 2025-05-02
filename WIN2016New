@@ -42,9 +42,7 @@
         enabled: yes
 
     - name: Run the scheduled task
-      win_scheduled_task:
-        name: "{{ task_name }}"
-        state: started
+      win_command: schtasks /run /tn "{{ task_name }}"
 
     - name: Wait for scheduled task to complete (optional)
       win_shell: |
