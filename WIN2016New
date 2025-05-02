@@ -1,34 +1,62 @@
 ---
-- name: Ensure Samba share is mapped and accessible
-  hosts: WIN2016
-  remote_user: ansible
-  connection: winrm
+- name: Install Patch from Samba Share with Domain User Credentials
+  hosts: all
   gather_facts: no
+
+  vars:
+    patch_kb: KB5058921
+    patch_file: KB5058921.msu
+    samba_server: 192.168.29.78
+    samba_share: winpatches
+    samba_user: smbuser
+    samba_password: "0pT1mus9r1me#"
+    mapped_drive: "Z:"
+    unc_patch_path: "\\\\{{ samba_server }}\\{{ samba_share }}\\{{ patch_file }}"
+
   tasks:
-    - name: Map Samba share with domain credentials
-      ansible.windows.win_command:
-        cmd: "net use Z: \\\\192.168.29.78\\winpatches /user:smbuser \"0pT1mus9r1me#\""
+    - name: Ensure WinRM is running
+      win_service:
+        name: WinRM
+        state: started
+        start_mode: auto
+
+    - name: Create log directory
+      win_file:
+        path: C:\temp
+        state: directory
+
+    - name: Clear any existing connection to the Samba server
+      win_command: net use \\{{ samba_server }} /delete
       ignore_errors: yes
-      register: net_use_result
 
-    - name: Ensure the Z: drive is mapped
-      ansible.windows.win_command:
-        cmd: "net use"
-      register: net_use_output
-      failed_when: "'Z:' not in net_use_output.stdout"
-
-    - name: Pause to ensure the drive has time to map
-      ansible.builtin.pause:
-        seconds: 5
+    - name: Map Samba share with domain credentials
+      win_command: >
+        net use {{ mapped_drive }} \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_user }} "{{ samba_password }}"
+      register: map_result
+      ignore_errors: no
 
     - name: Verify that the network drive is mapped
-      ansible.windows.win_command:
-        cmd: "dir Z:"
-      when: "'Z:' in net_use_output.stdout"
-      register: result
-      failed_when: result.rc != 0
+      win_command: dir {{ mapped_drive }}
+      register: dir_result
+      failed_when: dir_result.rc != 0
+      ignore_errors: no
 
-    - name: Output the result of the directory listing
-      debug:
-        var: result.stdout
-      when: "'Z:' in net_use_output.stdout"
+    - name: Install patch directly from network share
+      win_command: >
+        wusa.exe {{ unc_patch_path }} /quiet /norestart
+      register: patch_result
+      ignore_errors: yes
+
+    - name: Unmap the network drive after patch installation
+      win_command: net use {{ mapped_drive }} /delete
+      ignore_errors: yes
+
+    - name: Log patch install result
+      win_shell: |
+        "$((Get-Date).ToString()) - Patch {{ patch_kb }} Install Status: {{ 'Success' if patch_result.rc == 0 else 'FAILED' }}" |
+        Out-File -FilePath C:\temp\{{ patch_kb }}_install.log -Append
+
+    - name: Reboot the system if the patch requires it
+      win_reboot:
+        reboot_timeout: 3600
+      when: patch_result.rc == 3010
