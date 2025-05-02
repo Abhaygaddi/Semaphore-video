@@ -1,5 +1,5 @@
 ---
-- name: Install Patch from Linux Samba Share with Clean Mapping
+- name: Install Windows Patch from UNC Path using Scheduled Task
   hosts: all
   gather_facts: no
 
@@ -8,9 +8,8 @@
     patch_file: KB5058921.msu
     samba_server: 192.168.29.78
     samba_share: winpatches
-    samba_user: smbuser
-    samba_password: "0pT1mus9r1me#"
     unc_patch_path: "\\\\{{ samba_server }}\\{{ samba_share }}\\{{ patch_file }}"
+    task_name: Install_{{ patch_kb }}
 
   tasks:
     - name: Ensure WinRM is running
@@ -24,32 +23,45 @@
         path: C:\temp
         state: directory
 
-    - name: Clear any existing connection to the Samba server
-      win_command: net use \\{{ samba_server }} /delete
+    - name: Clear previous scheduled task if exists
+      win_scheduled_task:
+        name: "{{ task_name }}"
+        state: absent
       ignore_errors: yes
 
-    - name: Map Samba share with full user format
-      win_command: >
-        net use \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_server }}\{{ samba_user }} "{{ samba_password }}"
-      register: map_result
-      ignore_errors: no
+    - name: Create scheduled task to install patch from UNC path
+      win_scheduled_task:
+        name: "{{ task_name }}"
+        description: "Install patch {{ patch_kb }} from network share"
+        actions:
+          - path: wusa.exe
+            arguments: "{{ unc_patch_path }} /quiet /norestart"
+        username: SYSTEM
+        run_level: highest
+        state: present
+        enabled: yes
 
-    - name: Install patch directly from network share
-      win_command: >
-        wusa.exe {{ unc_patch_path }} /quiet /norestart
-      register: patch_result
-      ignore_errors: yes
+    - name: Run the scheduled task
+      win_scheduled_task:
+        name: "{{ task_name }}"
+        state: started
 
-    - name: Unmap Samba share
-      win_command: net use \\{{ samba_server }}\{{ samba_share }} /delete
-      ignore_errors: yes
-
-    - name: Log patch install result
+    - name: Wait for scheduled task to complete (optional)
       win_shell: |
-        "$((Get-Date).ToString()) - Patch {{ patch_kb }} Install Status: {{ 'Success' if patch_result.rc == 0 else 'FAILED' }}" |
-        Out-File -FilePath C:\temp\{{ patch_kb }}_install.log -Append
+        do {
+          Start-Sleep -Seconds 10
+          $status = (Get-ScheduledTask -TaskName "{{ task_name }}").State
+        } while ($status -ne 'Ready' -and $status -ne 'Disabled')
+      async: 180
+      poll: 0
 
-    - name: Reboot if patch requires it
-      win_reboot:
-        reboot_timeout: 3600
-      when: patch_result.rc == 3010
+    - name: Remove scheduled task after execution
+      win_scheduled_task:
+        name: "{{ task_name }}"
+        state: absent
+        ignore_errors: yes
+
+    - name: Log patch install event
+      win_shell: |
+        "$((Get-Date).ToString()) - Patch {{ patch_kb }} install task triggered from UNC path." |
+        Out-File -FilePath C:\temp\{{ patch_kb }}_install.log -Append
