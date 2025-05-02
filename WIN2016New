@@ -1,4 +1,4 @@
-- name: Install patch from network share via SYSTEM task
+- name: Install patch from network share via scheduled task as domain user and reboot
   hosts: WIN2016
   gather_facts: no
   vars:
@@ -6,30 +6,31 @@
     patch_filename: "KB5058921.msu"
     samba_user: "smbuser"
     samba_password: "0pT1mus9r1me#"
-    task_name: "RunPatchTask"
-    task_time: "23:59"  # set it slightly in the future, 24h format
+    domain_user: "testdc\\ansible"
+    domain_password: "0pT1mus9r1me#"
+    task_name: "RunPatchAsDomainUser"
+    task_time: "23:59"  # Adjust to one or two minutes ahead of current time
 
   tasks:
-    - name: Ensure patch folder exists
-      ansible.windows.win_file:
-        path: C:\Temp\patches
-        state: directory
-
-    - name: Map share and copy patch locally
+    - name: Map network share using Samba credentials
       ansible.windows.win_command: >
-        cmd.exe /c net use {{ samba_share_path }} {{ samba_password }} /user:{{ samba_user }} &&
-        copy {{ samba_share_path }}\\{{ patch_filename }} C:\\Temp\\patches\\ /Y
-      register: copy_patch
-      changed_when: "'1 file(s) copied' in copy_patch.stdout"
+        cmd.exe /c net use {{ samba_share_path }} {{ samba_password }} /user:{{ samba_user }}
+      register: map_result
+      failed_when: map_result.rc != 0 and "'The command completed successfully.'" not in map_result.stdout
 
-    - name: Create scheduled task to install patch locally as SYSTEM
+    - name: Create scheduled task to install the patch using domain account
       ansible.windows.win_command: >
-        schtasks /Create /TN {{ task_name }} /TR "wusa C:\\Temp\\patches\\{{ patch_filename }} /quiet /norestart" /SC ONCE /ST {{ task_time }} /RL HIGHEST /RU SYSTEM /F
+        schtasks /Create /TN {{ task_name }} /TR "wusa {{ samba_share_path }}\\{{ patch_filename }} /quiet /norestart" /SC ONCE /ST {{ task_time }} /RL HIGHEST /RU "{{ domain_user }}" /RP "{{ domain_password }}" /F
 
     - name: Run the scheduled task
       ansible.windows.win_command: >
         schtasks /Run /TN {{ task_name }}
 
-    - name: Wait for the patch to install
+    - name: Wait for patch installation to complete
       pause:
         seconds: 90
+
+    - name: Reboot the server
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
+        test_command: 'powershell -Command "Get-HotFix -Id KB5058921"'
