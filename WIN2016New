@@ -28,6 +28,17 @@
         state: absent
       ignore_errors: yes
 
+    - name: Ensure network drive is mapped
+      win_command: net use {{ mapped_drive }} \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_user }} "{{ samba_password }}"
+      register: net_use_result
+      ignore_errors: yes
+
+    - name: Verify that the network drive is mapped
+      win_command: "dir {{ mapped_drive }}"
+      register: dir_result
+      failed_when: dir_result.rc != 0
+      ignore_errors: no
+
     - name: Install patch directly from mapped drive
       win_command: >
         wusa.exe "{{ patch_path }}" /quiet /norestart
