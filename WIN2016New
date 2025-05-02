@@ -1,5 +1,5 @@
 - name: Install patch from network share via SYSTEM task
-  hosts: windows_servers
+  hosts: WIN2016
   gather_facts: no
   vars:
     samba_share_path: "\\\\192.168.29.78\\winpatches"
