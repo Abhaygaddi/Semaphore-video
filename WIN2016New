@@ -6,7 +6,7 @@
   vars:
     patch_kb: KB5058921
     patch_file: KB5058921.msu
-    mapped_drive: Z:
+    mapped_drive: "Z:"
     patch_path: "{{ mapped_drive }}\\{{ patch_file }}"
     task_name: Install_{{ patch_kb }}
 
