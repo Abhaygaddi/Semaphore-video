@@ -1,42 +1,52 @@
 ---
-- name: Install Specific Patch Directly from Linux Samba Share on Windows Server 2016
+- name: Install Patch from Linux Samba Share
   hosts: all
   gather_facts: no
 
   vars:
     patch_kb: KB5058921
-    patch_share_path: "\\\\<192.168.29.78>\\winpatches\\KB5058921.msu"
+    patch_file: KB5058921.msu
+    samba_server: 192.168.29.78
+    samba_share: winpatches
+    samba_user: smbuser
+    samba_password: 0pT1mus9r1me#  # 🔐 Best to pass this via Ansible Vault
+    unc_patch_path: "\\\\{{ samba_server }}\\{{ samba_share }}\\{{ patch_file }}"
 
   tasks:
-    - name: Ensure WinRM service is running
+    - name: Ensure WinRM is running
       win_service:
         name: WinRM
         state: started
         start_mode: auto
 
-    - name: Start Windows Update service
-      win_service:
-        name: wuauserv
-        state: started
-        start_mode: auto
-
-    - name: Create Log Directory
+    - name: Create log directory
       win_file:
         path: C:\temp
         state: directory
 
+    - name: Map network share with credentials
+      win_command: >
+        net use \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_user }} "{{ samba_password }}"
+      register: map_result
+      ignore_errors: no
+
     - name: Install patch directly from network share
       win_command: >
-        wusa.exe {{ patch_share_path }} /quiet /norestart
-      register: patch_install
+        wusa.exe {{ unc_patch_path }} /quiet /norestart
+      register: patch_result
+      ignore_errors: yes
+
+    - name: Unmap network share
+      win_command: >
+        net use \\{{ samba_server }}\{{ samba_share }} /delete
       ignore_errors: yes
 
     - name: Log patch install result
       win_shell: |
-        "$((Get-Date).ToString()) - Patch {{ patch_kb }} Install Status: {{ 'Success' if patch_install.rc == 0 else 'FAILED' }}" |
+        "$((Get-Date).ToString()) - Patch {{ patch_kb }} Install Status: {{ 'Success' if patch_result.rc == 0 else 'FAILED' }}" |
         Out-File -FilePath C:\temp\{{ patch_kb }}_install.log -Append
 
-    - name: Reboot if Required
+    - name: Reboot if patch requires it
       win_reboot:
         reboot_timeout: 3600
-      when: patch_install.rc == 3010
+      when: patch_result.rc == 3010
