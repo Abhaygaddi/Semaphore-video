@@ -1,43 +1,34 @@
----
-- name: Install Windows patch from Samba share
+- name: Copy patch from Samba to Windows target and install
   hosts: windows
   gather_facts: no
   vars:
     samba_server: "192.168.29.78"
     samba_share: "winpatches"
     patch_file: "KB5058921.msu"
+    dest_path: "C:\\Temp\\patches\\KB5058921.msu"
     samba_user: "smbuser"
     samba_password: "0pT1mus9r1me#"
-
   tasks:
-    - name: Authenticate to Samba share (ignore error if already connected)
-      ansible.windows.win_command: >
-        net use \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_user }} "{{ samba_password }}"
-      ignore_errors: true
-
-    - name: Ensure local patch directory exists
+    - name: Ensure destination directory exists
       ansible.windows.win_file:
-        path: C:\Temp\patches
+        path: "C:\\Temp\\patches"
         state: directory
+
+    - name: Map network drive with Samba credentials
+      ansible.windows.win_command: >
+        cmd.exe /c net use \\{{ samba_server }}\{{ samba_share }}
+        {{ samba_password }} /user:{{ samba_user }}
+      register: net_use_result
+      failed_when: "'The command completed successfully' not in net_use_result.stdout"
 
     - name: Copy patch file from Samba share
       ansible.windows.win_command: >
-        cmd.exe /c "copy \\{{ samba_server }}\{{ samba_share }}\{{ patch_file }} C:\Temp\patches\ /Y"
+        cmd.exe /c copy \\{{ samba_server }}\{{ samba_share }}\{{ patch_file }}
+        {{ dest_path }} /Y
       register: copy_result
-      failed_when: copy_result.rc != 0
+      failed_when: "'1 file(s) copied' not in copy_result.stdout"
 
-    - name: Install patch silently
+    - name: Unmap network share
       ansible.windows.win_command: >
-        wusa.exe C:\Temp\patches\{{ patch_file }} /quiet /norestart
-      register: install_result
-      failed_when: install_result.rc != 0
-
-    - name: Reboot if required
-      ansible.windows.win_reboot:
-        reboot_timeout: 600
-      when: install_result.reboot_required | default(true)
-
-    - name: Disconnect Samba share
-      ansible.windows.win_command: >
-        net use \\{{ samba_server }}\{{ samba_share }} /delete
-      ignore_errors: true
+        cmd.exe /c net use \\{{ samba_server }}\{{ samba_share }} /delete
+      ignore_errors: yes
