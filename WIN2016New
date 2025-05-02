@@ -31,4 +31,4 @@
     - name: Output the result of the directory listing
       debug:
         var: result.stdout
-      when: "'Z:' in net_use_output.stdout
+      when: "'Z:' in net_use_output.stdout"
