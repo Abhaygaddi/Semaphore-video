@@ -1,5 +1,5 @@
 ---
-- name: Install Windows Patch from UNC Path with Error Logging
+- name: Install Windows Patch from UNC Path with Error Logging and Debugging
   hosts: all
   gather_facts: no
 
@@ -28,6 +28,16 @@
         name: "{{ task_name }}"
         state: absent
       ignore_errors: yes
+
+    - name: Check if the UNC path is accessible
+      win_command: |
+        dir "\\{{ samba_server }}\{{ samba_share }}"
+      register: unc_path_check
+      ignore_errors: yes
+
+    - name: Log UNC path accessibility result
+      debug:
+        msg: "UNC path accessibility check result: {{ unc_path_check }}"
 
     - name: Create scheduled task to install patch from UNC path
       win_scheduled_task:
@@ -59,7 +69,7 @@
       async: 180
       poll: 0
 
-    - name: Check if patch installed successfully
+    - name: Check for log file after patch installation
       win_shell: |
         if (Test-Path "C:\\temp\\{{ patch_kb }}_install.log") {
           Get-Content "C:\\temp\\{{ patch_kb }}_install.log" | Select-String "Success"
