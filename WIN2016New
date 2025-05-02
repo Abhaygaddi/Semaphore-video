@@ -1,34 +1,39 @@
-- name: Copy patch from Samba to Windows target and install
-  hosts: windows
+---
+- name: Install Windows patch from Samba share without copying
+  hosts: WIN2016
   gather_facts: no
   vars:
-    samba_server: "192.168.29.78"
-    samba_share: "winpatches"
-    patch_file: "KB5058921.msu"
-    dest_path: "C:\\Temp\\patches\\KB5058921.msu"
+    samba_share_path: "\\\\192.168.29.78\\winpatches"
+    patch_filename: "KB5058921.msu"
     samba_user: "smbuser"
     samba_password: "0pT1mus9r1me#"
+
   tasks:
-    - name: Ensure destination directory exists
-      ansible.windows.win_file:
-        path: "C:\\Temp\\patches"
-        state: directory
 
-    - name: Map network drive with Samba credentials
+    - name: Map network share using Samba credentials
       ansible.windows.win_command: >
-        cmd.exe /c net use \\{{ samba_server }}\{{ samba_share }}
-        {{ samba_password }} /user:{{ samba_user }}
-      register: net_use_result
-      failed_when: "'The command completed successfully' not in net_use_result.stdout"
+        cmd.exe /c net use {{ samba_share_path }} {{ samba_password }} /user:{{ samba_user }}
+      register: map_result
+      changed_when: "'The command completed successfully.' in map_result.stdout"
+      failed_when: "'error' in map_result.stderr.lower()"
 
-    - name: Copy patch file from Samba share
+    - name: Run Windows Update patch directly from network share
       ansible.windows.win_command: >
-        cmd.exe /c copy \\{{ samba_server }}\{{ samba_share }}\{{ patch_file }}
-        {{ dest_path }} /Y
-      register: copy_result
-      failed_when: "'1 file(s) copied' not in copy_result.stdout"
+        cmd.exe /c wusa {{ samba_share_path }}\\{{ patch_filename }} /quiet /norestart
+      register: patch_result
+      failed_when: patch_result.rc != 0
+
+    - name: Wait for patch installation to settle
+      ansible.builtin.pause:
+        seconds: 20
 
     - name: Unmap network share
       ansible.windows.win_command: >
-        cmd.exe /c net use \\{{ samba_server }}\{{ samba_share }} /delete
-      ignore_errors: yes
+        cmd.exe /c net use {{ samba_share_path }} /delete
+      register: unmap_result
+      changed_when: "'successfully' in unmap_result.stdout.lower()"
+      failed_when: false  # suppress error if already unmapped
+
+    - name: Print installation result
+      debug:
+        var: patch_result.stdout_lines
