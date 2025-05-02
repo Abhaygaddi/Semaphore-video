@@ -1,37 +1,34 @@
 ---
-- name: Install Patch KB5058921 on Windows Server
+- name: Ensure Samba share is mapped and accessible
   hosts: WIN2016
+  remote_user: ansible
+  connection: winrm
+  gather_facts: no
   tasks:
     - name: Map Samba share with domain credentials
       ansible.windows.win_command:
         cmd: "net use Z: \\\\192.168.29.78\\winpatches /user:smbuser \"0pT1mus9r1me#\""
       ignore_errors: yes
+      register: net_use_result
+
+    - name: Ensure the Z: drive is mapped
+      ansible.windows.win_command:
+        cmd: "net use"
+      register: net_use_output
+      failed_when: "'Z:' not in net_use_output.stdout"
+
+    - name: Pause to ensure the drive has time to map
+      ansible.builtin.pause:
+        seconds: 5
 
     - name: Verify that the network drive is mapped
       ansible.windows.win_command:
         cmd: "dir Z:"
+      when: "'Z:' in net_use_output.stdout"
       register: result
       failed_when: result.rc != 0
 
-    - name: Install the patch
-      ansible.windows.win_command:
-        cmd: "wusa.exe \"Z:\\KB5058921.msu\" /quiet /norestart"
-      register: patch_install
-      failed_when: patch_install.rc != 0
-
-    - name: Reboot the server if needed after patch installation
-      ansible.windows.win_reboot:
-        reboot_timeout: 600
-        test_command: "echo 'Reboot check'"
-      when: patch_install.rc == 0
-
-    - name: Remove the mapped network drive
-      ansible.windows.win_command:
-        cmd: "net use Z: /delete"
-      ignore_errors: yes
-
-    - name: Verify that the network drive has been removed
-      ansible.windows.win_command:
-        cmd: "net use Z:"
-      register: result
-      failed_when: result.rc == 0
+    - name: Output the result of the directory listing
+      debug:
+        var: result.stdout
+      when: "'Z:' in net_use_output.stdout"
