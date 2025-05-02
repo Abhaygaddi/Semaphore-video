@@ -7,6 +7,10 @@
     patch_kb: KB5058921
     patch_file: KB5058921.msu
     mapped_drive: "Z:"
+    samba_server: 192.168.29.78
+    samba_share: winpatches
+    samba_user: smbuser
+    samba_password: "0pT1mus9r1me#"
     patch_path: "{{ mapped_drive }}\\{{ patch_file }}"
     task_name: Install_{{ patch_kb }}
 
