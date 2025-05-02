@@ -1,5 +1,5 @@
 ---
-- name: Install Windows patch from Samba share without copying
+- name: Install patch from network share as SYSTEM via Scheduled Task
   hosts: WIN2016
   gather_facts: no
   vars:
@@ -7,6 +7,7 @@
     patch_filename: "KB5058921.msu"
     samba_user: "smbuser"
     samba_password: "0pT1mus9r1me#"
+    task_name: "RunPatchTask"
 
   tasks:
 
@@ -17,23 +18,28 @@
       changed_when: "'The command completed successfully.' in map_result.stdout"
       failed_when: "'error' in map_result.stderr.lower()"
 
-    - name: Run Windows Update patch directly from network share
+    - name: Create scheduled task to install the patch as SYSTEM
       ansible.windows.win_command: >
-        cmd.exe /c wusa {{ samba_share_path }}\\{{ patch_filename }} /quiet /norestart
-      register: patch_result
-      failed_when: patch_result.rc != 0
+        schtasks /Create /TN {{ task_name }} /TR "wusa {{ samba_share_path }}\\{{ patch_filename }} /quiet /norestart" /SC ONCE /ST 00:00 /RL HIGHEST /RU SYSTEM
+      register: create_task
+      failed_when: "'ERROR' in create_task.stdout"
 
-    - name: Wait for patch installation to settle
+    - name: Run the scheduled task
+      ansible.windows.win_command: >
+        schtasks /Run /TN {{ task_name }}
+      register: run_task
+
+    - name: Wait for the task to finish (approx 60 sec)
       ansible.builtin.pause:
-        seconds: 20
+        seconds: 60
+
+    - name: Delete scheduled task after completion
+      ansible.windows.win_command: >
+        schtasks /Delete /TN {{ task_name }} /F
+      register: delete_task
 
     - name: Unmap network share
       ansible.windows.win_command: >
         cmd.exe /c net use {{ samba_share_path }} /delete
       register: unmap_result
-      changed_when: "'successfully' in unmap_result.stdout.lower()"
-      failed_when: false  # suppress error if already unmapped
-
-    - name: Print installation result
-      debug:
-        var: patch_result.stdout_lines
+      failed_when: false
