@@ -1,5 +1,5 @@
 ---
-- name: Install Windows patch from Samba share using UNC path
+- name: Install Windows patch from Samba share
   hosts: windows
   gather_facts: no
   vars:
@@ -10,29 +10,34 @@
     samba_password: "0pT1mus9r1me#"
 
   tasks:
-    - name: Ensure destination folder exists
+    - name: Authenticate to Samba share (ignore error if already connected)
+      ansible.windows.win_command: >
+        net use \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_user }} "{{ samba_password }}"
+      ignore_errors: true
+
+    - name: Ensure local patch directory exists
       ansible.windows.win_file:
-        path: "C:\\Temp\\patches"
+        path: C:\Temp\patches
         state: directory
 
-    - name: Copy patch from Samba share to target using UNC path
+    - name: Copy patch file from Samba share
       ansible.windows.win_command: >
         cmd.exe /c "copy \\{{ samba_server }}\{{ samba_share }}\{{ patch_file }} C:\Temp\patches\ /Y"
-      environment:
-        USERNAME: "{{ samba_user }}"
-        PASSWORD: "{{ samba_password }}"
       register: copy_result
       failed_when: copy_result.rc != 0
-      ignore_errors: no
 
-    - name: Install patch using wusa
+    - name: Install patch silently
       ansible.windows.win_command: >
-        wusa.exe "C:\Temp\patches\{{ patch_file }}" /quiet /norestart
+        wusa.exe C:\Temp\patches\{{ patch_file }} /quiet /norestart
       register: install_result
       failed_when: install_result.rc != 0
-      ignore_errors: no
 
     - name: Reboot if required
       ansible.windows.win_reboot:
         reboot_timeout: 600
-      when: install_result.reboot_required is defined and install_result.reboot_required
+      when: install_result.reboot_required | default(true)
+
+    - name: Disconnect Samba share
+      ansible.windows.win_command: >
+        net use \\{{ samba_server }}\{{ samba_share }} /delete
+      ignore_errors: true
