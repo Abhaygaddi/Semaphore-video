@@ -1,14 +1,13 @@
 ---
-- name: Install Windows Patch from UNC Path with Error Logging and Debugging
+- name: Install Windows Patch from Mapped Drive
   hosts: all
   gather_facts: no
 
   vars:
     patch_kb: KB5058921
     patch_file: KB5058921.msu
-    samba_server: 192.168.29.78
-    samba_share: winpatches
-    unc_patch_path: "\\\\{{ samba_server }}\\{{ samba_share }}\\{{ patch_file }}"
+    mapped_drive: Z:
+    patch_path: "{{ mapped_drive }}\\{{ patch_file }}"
     task_name: Install_{{ patch_kb }}
 
   tasks:
@@ -29,71 +28,21 @@
         state: absent
       ignore_errors: yes
 
-    - name: Check if the UNC path is accessible
-      win_command: |
-        dir "\\{{ samba_server }}\{{ samba_share }}"
-      register: unc_path_check
+    - name: Install patch directly from mapped drive
+      win_command: >
+        wusa.exe "{{ patch_path }}" /quiet /norestart
+      register: patch_result
       ignore_errors: yes
 
-    - name: Log UNC path accessibility result
+    - name: Log patch install result
       debug:
-        msg: "UNC path accessibility check result: {{ unc_path_check }}"
-
-    - name: Create scheduled task to install patch from UNC path
-      win_scheduled_task:
-        name: "{{ task_name }}"
-        description: "Install patch {{ patch_kb }} from network share"
-        actions:
-          - path: wusa.exe
-            arguments: "{{ unc_patch_path }} /quiet /norestart"
-        username: SYSTEM
-        run_level: highest
-        state: present
-        enabled: yes
-
-    - name: Run the scheduled task
-      win_command: schtasks /run /tn "{{ task_name }}"
-      register: task_run_result
-      ignore_errors: yes
-
-    - name: Log the result of task execution
-      debug:
-        msg: "Scheduled task run result: {{ task_run_result }}"
-
-    - name: Wait for scheduled task to complete (optional)
-      win_shell: |
-        do {
-          Start-Sleep -Seconds 10
-          $status = (Get-ScheduledTask -TaskName "{{ task_name }}").State
-        } while ($status -ne 'Ready' -and $status -ne 'Disabled')
-      async: 180
-      poll: 0
-
-    - name: Check for log file after patch installation
-      win_shell: |
-        if (Test-Path "C:\\temp\\{{ patch_kb }}_install.log") {
-          Get-Content "C:\\temp\\{{ patch_kb }}_install.log" | Select-String "Success"
-        } else {
-          Write-Host "No log file found"
-        }
-      register: patch_check
-      ignore_errors: yes
-
-    - name: Log patch install status
-      debug:
-        msg: "Patch installation log: {{ patch_check.stdout }}"
-
-    - name: Remove scheduled task after execution
-      win_scheduled_task:
-        name: "{{ task_name }}"
-        state: absent
-        ignore_errors: yes
-
-    - name: Check if reboot is required after patch install
-      win_command: shutdown /r /f /t 0
-      when: ansible_facts['reboot_required'] | default(false)
+        msg: "Patch installation result: {{ patch_result }}"
 
     - name: Reboot the server if required
       win_reboot:
         reboot_timeout: 600
-      when: ansible_facts['reboot_required'] | default(false)
+      when: patch_result.rc == 3010
+
+    - name: Remove the mapped network drive
+      win_command: net use Z: /delete
+      ignore_errors: yes
