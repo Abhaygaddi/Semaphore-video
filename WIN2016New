@@ -1,7 +1,8 @@
 ---
-- name: Install Windows Patch from Samba Share using Domain Credentials
+- name: Install Patch from Samba Share Using UNC Path
   hosts: all
   gather_facts: no
+
   vars:
     patch_kb: KB5058921
     patch_file: KB5058921.msu
@@ -9,51 +10,41 @@
     samba_share: winpatches
     samba_user: smbuser
     samba_password: "0pT1mus9r1me#"
-    mapped_drive: "Z:"
-    unc_patch_path: '\\{{ samba_server }}\{{ samba_share }}\{{ patch_file }}'
+    unc_patch_path: "\\\\{{ samba_server }}\\{{ samba_share }}\\{{ patch_file }}"
 
   tasks:
     - name: Ensure WinRM is running
-      win_service:
+      ansible.windows.win_service:
         name: WinRM
         state: started
         start_mode: auto
 
-    - name: Create log directory
-      win_file:
+    - name: Create C:\temp if not exists
+      ansible.windows.win_file:
         path: C:\temp
         state: directory
 
-    - name: Clear any existing connection to the Samba server
-      win_command: 'net use \\{{ samba_server }} /delete'
+    - name: Map share temporarily using explicit command
+      ansible.windows.win_command: >
+        cmd.exe /c "net use \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_user }} {{ samba_password }}"
       ignore_errors: yes
 
-    - name: Map Samba share with domain credentials
-      win_command: 'net use {{ mapped_drive }} \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_user }} "{{ samba_password }}"'
-      register: map_result
-      ignore_errors: no
-
-    - name: Verify the mapped network drive
-      win_command: 'dir {{ mapped_drive }}'
-      register: dir_result
-      failed_when: dir_result.rc != 0
-      ignore_errors: no
-
-    - name: Install the patch from the network share
-      win_command: 'wusa.exe {{ unc_patch_path }} /quiet /norestart'
+    - name: Install patch using UNC path
+      ansible.windows.win_command: >
+        wusa.exe "{{ unc_patch_path }}" /quiet /norestart
       register: patch_result
       ignore_errors: yes
 
-    - name: Unmap the network drive
-      win_command: 'net use {{ mapped_drive }} /delete'
+    - name: Unmap share
+      ansible.windows.win_command: cmd.exe /c "net use \\{{ samba_server }}\{{ samba_share }} /delete"
       ignore_errors: yes
 
-    - name: Log patch installation result
-      win_shell: |
+    - name: Log patch install result
+      ansible.windows.win_shell: |
         "$((Get-Date).ToString()) - Patch {{ patch_kb }} Install Status: {{ 'Success' if patch_result.rc == 0 else 'FAILED' }}" |
         Out-File -FilePath C:\temp\{{ patch_kb }}_install.log -Append
 
-    - name: Reboot the system if required
-      win_reboot:
+    - name: Reboot if patch requires it
+      ansible.windows.win_reboot:
         reboot_timeout: 3600
       when: patch_result.rc == 3010
