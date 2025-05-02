@@ -1,5 +1,5 @@
 ---
-- name: Install Windows Patch from UNC Path using Scheduled Task with Reboot
+- name: Install Windows Patch from UNC Path with Error Logging
   hosts: all
   gather_facts: no
 
@@ -43,6 +43,12 @@
 
     - name: Run the scheduled task
       win_command: schtasks /run /tn "{{ task_name }}"
+      register: task_run_result
+      ignore_errors: yes
+
+    - name: Log the result of task execution
+      debug:
+        msg: "Scheduled task run result: {{ task_run_result }}"
 
     - name: Wait for scheduled task to complete (optional)
       win_shell: |
@@ -53,16 +59,25 @@
       async: 180
       poll: 0
 
+    - name: Check if patch installed successfully
+      win_shell: |
+        if (Test-Path "C:\\temp\\{{ patch_kb }}_install.log") {
+          Get-Content "C:\\temp\\{{ patch_kb }}_install.log" | Select-String "Success"
+        } else {
+          Write-Host "No log file found"
+        }
+      register: patch_check
+      ignore_errors: yes
+
+    - name: Log patch install status
+      debug:
+        msg: "Patch installation log: {{ patch_check.stdout }}"
+
     - name: Remove scheduled task after execution
       win_scheduled_task:
         name: "{{ task_name }}"
         state: absent
         ignore_errors: yes
-
-    - name: Log patch install event
-      win_shell: |
-        "$((Get-Date).ToString()) - Patch {{ patch_kb }} install task triggered from UNC path." |
-        Out-File -FilePath C:\temp\{{ patch_kb }}_install.log -Append
 
     - name: Check if reboot is required after patch install
       win_command: shutdown /r /f /t 0
