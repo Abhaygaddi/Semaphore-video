@@ -1,8 +1,7 @@
 ---
-- name: Install Windows Patch from UNC Path (No Drive Mapping)
+- name: Install Windows Patch from Samba Share using Domain Credentials
   hosts: all
   gather_facts: no
-
   vars:
     patch_kb: KB5058921
     patch_file: KB5058921.msu
@@ -10,7 +9,8 @@
     samba_share: winpatches
     samba_user: smbuser
     samba_password: "0pT1mus9r1me#"
-    unc_patch_path: "\\{{ samba_server }}\{{ samba_share }}\{{ patch_file }}"
+    mapped_drive: "Z:"
+    unc_patch_path: '\\{{ samba_server }}\{{ samba_share }}\{{ patch_file }}'
 
   tasks:
     - name: Ensure WinRM is running
@@ -24,29 +24,36 @@
         path: C:\temp
         state: directory
 
-    - name: Authenticate to the Samba share (without drive mapping)
-      win_command: >
-        net use \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_user }} "{{ samba_password }}"
-      register: auth_result
+    - name: Clear any existing connection to the Samba server
+      win_command: 'net use \\{{ samba_server }} /delete'
+      ignore_errors: yes
+
+    - name: Map Samba share with domain credentials
+      win_command: 'net use {{ mapped_drive }} \\{{ samba_server }}\{{ samba_share }} /user:{{ samba_user }} "{{ samba_password }}"'
+      register: map_result
       ignore_errors: no
 
-    - name: Install patch directly from UNC path
-      win_command: >
-        wusa.exe "{{ unc_patch_path }}" /quiet /norestart
+    - name: Verify the mapped network drive
+      win_command: 'dir {{ mapped_drive }}'
+      register: dir_result
+      failed_when: dir_result.rc != 0
+      ignore_errors: no
+
+    - name: Install the patch from the network share
+      win_command: 'wusa.exe {{ unc_patch_path }} /quiet /norestart'
       register: patch_result
       ignore_errors: yes
 
-    - name: Disconnect from Samba share after installation
-      win_command: >
-        net use \\{{ samba_server }}\{{ samba_share }} /delete
+    - name: Unmap the network drive
+      win_command: 'net use {{ mapped_drive }} /delete'
       ignore_errors: yes
 
-    - name: Log patch install result
+    - name: Log patch installation result
       win_shell: |
         "$((Get-Date).ToString()) - Patch {{ patch_kb }} Install Status: {{ 'Success' if patch_result.rc == 0 else 'FAILED' }}" |
         Out-File -FilePath C:\temp\{{ patch_kb }}_install.log -Append
 
-    - name: Reboot the system if patch requires it
+    - name: Reboot the system if required
       win_reboot:
         reboot_timeout: 3600
       when: patch_result.rc == 3010
