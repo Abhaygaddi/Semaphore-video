@@ -39,13 +39,17 @@
       win_command: dir {{ mapped_drive }}
       register: dir_result
       failed_when: dir_result.rc != 0
-      ignore_errors: no
+      ignore_errors: yes
 
     - name: Install patch directly from network share
       win_command: >
         wusa.exe {{ unc_patch_path }} /quiet /norestart
       register: patch_result
       ignore_errors: yes
+
+    - name: Check if patch installed successfully
+      debug:
+        msg: "Patch install result: {{ patch_result.stdout }}"
 
     - name: Unmap the network drive after patch installation
       win_command: net use {{ mapped_drive }} /delete
@@ -60,3 +64,4 @@
       win_reboot:
         reboot_timeout: 3600
       when: patch_result.rc == 3010
+      ignore_errors: yes
