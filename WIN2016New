@@ -10,7 +10,7 @@
     samba_share: winpatches
     samba_user: testdc\ansible
     samba_password: "0pT1mus9r1me#"
-    mapped_drive: Z:
+    mapped_drive: "Z:"
     unc_patch_path: "\\\\{{ samba_server }}\\{{ samba_share }}\\{{ patch_file }}"
 
   tasks:
