@@ -1,34 +1,21 @@
 ---
-- name: Ensure Samba share is mapped and accessible
+- name: Map network drive on Windows
   hosts: WIN2016
-  remote_user: ansible
-  connection: winrm
   gather_facts: no
   tasks:
-    - name: Map Samba share with domain credentials
-      ansible.windows.win_command:
-        cmd: "net use Z: \\\\192.168.29.78\\winpatches /user:smbuser \"0pT1mus9r1me#\""
-      ignore_errors: yes
-      register: net_use_result
-
     - name: Ensure the Z: drive is mapped
       ansible.windows.win_command:
-        cmd: "net use"
-      register: net_use_output
-      failed_when: "'Z:' not in net_use_output.stdout"
+        cmd: "net use Z: \\\\192.168.29.78\\winpatches /user:testdc\\ansible '0pT1mus9r1me#'"
+        # Replace this path with your actual network share
+        # Ensure the credentials are correct and the share is accessible from the Windows machine
 
-    - name: Pause to ensure the drive has time to map
-      ansible.builtin.pause:
-        seconds: 5
-
-    - name: Verify that the network drive is mapped
+    - name: Verify if the Z: drive is mapped
       ansible.windows.win_command:
         cmd: "dir Z:"
-      when: "'Z:' in net_use_output.stdout"
-      register: result
-      failed_when: result.rc != 0
+      register: dir_output
+      failed_when: dir_output.rc != 0
+      # This task will fail if the directory doesn't exist or the drive is not mapped
 
-    - name: Output the result of the directory listing
+    - name: Print the output of the Z: drive
       debug:
-        var: result.stdout
-      when: "'Z:' in net_use_output.stdout"
+        var: dir_output.stdout
