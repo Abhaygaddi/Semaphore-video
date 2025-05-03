@@ -1,5 +1,5 @@
 - name: Install Windows patch from SMB share without copying or scheduled task
-  hosts: windows_servers
+  hosts: WIN2016
   gather_facts: no
   vars:
     smb_share: "\\\\192.168.29.78\\winpatches"
