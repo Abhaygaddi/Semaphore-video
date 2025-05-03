@@ -1,16 +1,32 @@
-- name: Install Windows patch from network share without copying or mapping
-  hosts: WIN2016
-  tasks:
-    - name: Ensure no Z drive exists
-      win_shell: |
-        if (Test-Path -Path "Z:\\") {
-          net use Z: /delete
-        }
-      register: drive_status
-      ignore_errors: yes  # This will prevent the task from failing if Z: doesn't exist
 
-    - name: Map network drive with credentials
-      win_shell: |
-        net use Z: "\\\\192.168.29.78\\winpatches" /user:testdc\\ansible "0pT1mus9r1me#"
-        Start-Process -FilePath "wusa.exe" -ArgumentList "Z:\\KB5058921.msu /quiet /norestart" -Wait
-        net use Z: /delete
+---
+- name: Patch Windows
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: Check var_category variable
+      ansible.builtin.assert:
+        that:
+          - var_category in ["SecurityUpdates", "CriticalUpdates", "UpdateRollups", "*"]
+        fail_msg: >-
+          var_category must be one of 'SecurityUpdates', 'CriticalUpdates', 'UpdateRollups' or '*.'
+          It is set to {{ var_category }}.
+        success_msg: "patch category is set to {{ var_category }}."
+
+    - name: Check var_state variable
+      ansible.builtin.assert:
+        that:
+          - var_state in ["installed", "searched", "downloaded"]
+        fail_msg: >-
+          var_state must be one of 'installed', 'searched', or 'downloaded.'
+          It is set to {{ var_state }}.
+        success_msg: "patch state is set to {{ var_state }}."
+
+    - name: Patch Windows hosts
+      ansible.windows.win_updates:
+        category_names: "{{ var_category }}"
+        log_path: "{{ log_dir }}"
+        skip_optional: true
+        state: "{{ var_state }}"
+        reboot: true
