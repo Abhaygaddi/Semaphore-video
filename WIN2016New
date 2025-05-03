@@ -1,29 +1,28 @@
-- name: Install Windows patch directly from SMB share
+- name: Install patch from mapped drive (Z:)
   hosts: WIN2016
   gather_facts: no
   vars:
-    patch_share: "\\\\192.168.29.78\\winpatches\\KB5058921.msu"
+    smb_share: "\\\\192.168.29.78\\winpatches"
+    patch_file: "KB5058921.msu"
+    drive_letter: "Z:"
     smb_user: "smbuser"
     smb_password: "0pT1mus9r1me#"
 
   tasks:
-
-    - name: Map network drive with Samba credentials
+    - name: Map network drive Z: with Samba credentials
       ansible.windows.win_command: >
-        cmd.exe /c net use {{ patch_share | regex_replace('\\\\[^\\]+\\[^\\]+\\.*$', '') }}
-        {{ smb_password }} /user:{{ smb_user }}
+        cmd.exe /c net use {{ drive_letter }} {{ smb_share }} {{ smb_password }} /user:{{ smb_user }}
       register: map_result
-      failed_when: "'Access is denied' in map_result.stdout"
       changed_when: "'The command completed successfully' in map_result.stdout"
+      failed_when: "'Access is denied' in map_result.stdout"
 
-    - name: Install patch from network share
+    - name: Install patch from mapped drive
       ansible.windows.win_command: >
-        cmd.exe /c wusa.exe {{ patch_share }} /quiet /norestart
+        cmd.exe /c wusa.exe {{ drive_letter }}\\{{ patch_file }} /quiet /norestart
       register: install_result
       failed_when: install_result.rc != 0
       changed_when: install_result.rc == 0
 
-    - name: Unmap network drive after installation
-      ansible.windows.win_command: >
-        cmd.exe /c net use {{ patch_share | regex_replace('\\\\[^\\]+\\[^\\]+\\.*$', '') }} /delete /yes
+    - name: Unmap network drive Z:
+      ansible.windows.win_command: cmd.exe /c net use {{ drive_letter }} /delete /yes
       ignore_errors: true
