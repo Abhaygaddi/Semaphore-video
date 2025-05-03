@@ -1,13 +1,15 @@
 ---
-- name: Install Windows updates from network share using local user
+- name: Install multiple Windows updates from network share using local user
   hosts: windows
   gather_facts: no
   vars:
-    share_path: "\\192.168.29.78\winpatches"
-    update_file: "KB5058921.msu"
-    drive_letter: "Z:"
-    local_user: "smbuser"
-    local_pass: "0pT1mus9r1me#"
+    share_path: '\\192.168.29.78\winpatches'
+    drive_letter: 'Z:'
+    local_user: 'smbuser'
+    local_pass: '0pT1mus9r1me#'
+    updates:
+      - KB5058921.msu
+      - KB5055521.msu
 
   tasks:
 
@@ -18,9 +20,11 @@
       failed_when: "'The command completed successfully' not in map_result.stdout and map_result.rc != 0"
       changed_when: false
 
-    - name: Install update from network share
+    - name: Install multiple updates from network share
       win_shell: |
-        Start-Process -FilePath "wusa.exe" -ArgumentList "{{ drive_letter }}\\{{ update_file }} /quiet /norestart" -Wait
+        foreach ($patch in {{ updates | to_json | from_json }}) {
+          Start-Process -FilePath "wusa.exe" -ArgumentList "{{ drive_letter }}\\$patch /quiet /norestart" -Wait
+        }
       register: install_result
       failed_when: install_result.rc != 0
       changed_when: true
