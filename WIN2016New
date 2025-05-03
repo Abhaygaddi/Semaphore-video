@@ -1,10 +1,11 @@
 ---
 - name: Patch Windows
-  hosts: windows  # Use the 'windows' group from your inventory
+  hosts: windows
   gather_facts: true
   vars:
-    var_category: "SecurityUpdates"  # Default value
-    var_state: "installed"  # Default value
+    var_category: "SecurityUpdates"
+    var_state: "installed"
+    log_dir: "C:\\Windows\\Temp\\patch_logs"  # Define log directory
 
   tasks:
     - name: Check var_category variable
@@ -28,7 +29,7 @@
     - name: Patch Windows hosts
       ansible.windows.win_updates:
         category_names: "{{ var_category }}"
-        log_path: "{{ log_dir }}"
+        log_path: "{{ log_dir }}"  # Log directory is now defined
         skip_optional: true
         state: "{{ var_state }}"
         reboot: true
