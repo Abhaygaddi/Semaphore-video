@@ -6,6 +6,8 @@
         if (Test-Path -Path "Z:\\") {
           net use Z: /delete
         }
+      register: drive_status
+      ignore_errors: yes  # This will prevent the task from failing if Z: doesn't exist
 
     - name: Map network drive with credentials
       win_shell: |
