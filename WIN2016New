@@ -1,5 +1,16 @@
-    - name: Install patches that are not already installed
+---
+- name: Install updates on Windows 2016
+  hosts: WIN2016
+  tasks:
+    - name: Install patches from SMB share
       win_shell: |
+        $username = "smbuser"
+        $password = "0pT1mus9r1me#"
+        $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
+        $credential = New-Object System.Management.Automation.PSCredential($username, $securePassword)
+
+        New-PSDrive -Name Z -PSProvider FileSystem -Root "\\192.168.29.78\winpatches" -Credential $credential | Out-Null
+        
         $patches = @("KB5058921", "KB5055521")
         foreach ($patch in $patches) {
           $fullPath = "Z:\\$patch.msu"
@@ -15,3 +26,5 @@
             Write-Host "Installation of $patch completed successfully"
           }
         }
+
+        Remove-PSDrive -Name Z
