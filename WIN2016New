@@ -29,5 +29,8 @@
           Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -Wait
         }
 
-    - name: Remove mapped network drive
-      win_shell: Remove-PSDrive -Name Z
+    - name: Remove mapped network drive if it exists
+      win_shell: |
+        if (Get-PSDrive -Name Z -ErrorAction SilentlyContinue) {
+            Remove-PSDrive -Name Z
+        }
