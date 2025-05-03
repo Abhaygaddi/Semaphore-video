@@ -1,36 +1,29 @@
-- name: Install patch from network share via scheduled task as domain user and reboot
+- name: Install Windows patch directly from SMB share
   hosts: WIN2016
   gather_facts: no
   vars:
-    samba_share_path: "\\\\192.168.29.78\\winpatches"
-    patch_filename: "KB5058921.msu"
-    samba_user: "smbuser"
-    samba_password: "0pT1mus9r1me#"
-    domain_user: "testdc\ansible"
-    domain_password: "0pT1mus9r1me#"
-    task_name: "RunPatchAsDomainUser"
-    task_time: "23:59"  # Adjust to one or two minutes ahead of current time
+    patch_share: "\\\\192.168.29.78\\winpatches\\KB5058921.msu"
+    smb_user: "smbuser"
+    smb_password: "0pT1mus9r1me#"
 
   tasks:
-    - name: Map network share using Samba credentials
+
+    - name: Map network drive with Samba credentials
       ansible.windows.win_command: >
-        cmd.exe /c net use {{ samba_share_path }} {{ samba_password }} /user:{{ samba_user }}
+        cmd.exe /c net use {{ patch_share | regex_replace('\\\\[^\\]+\\[^\\]+\\.*$', '') }}
+        {{ smb_password }} /user:{{ smb_user }}
       register: map_result
-      failed_when: map_result.rc != 0 and "'The command completed successfully.'" not in map_result.stdout
+      failed_when: "'Access is denied' in map_result.stdout"
+      changed_when: "'The command completed successfully' in map_result.stdout"
 
-    - name: Create scheduled task to install the patch using domain account
+    - name: Install patch from network share
       ansible.windows.win_command: >
-        schtasks /Create /TN {{ task_name }} /TR "wusa {{ samba_share_path }}\\{{ patch_filename }} /quiet /norestart" /SC ONCE /ST {{ task_time }} /RL HIGHEST /RU "{{ domain_user }}" /RP "{{ domain_password }}" /F
+        cmd.exe /c wusa.exe {{ patch_share }} /quiet /norestart
+      register: install_result
+      failed_when: install_result.rc != 0
+      changed_when: install_result.rc == 0
 
-    - name: Run the scheduled task
+    - name: Unmap network drive after installation
       ansible.windows.win_command: >
-        schtasks /Run /TN {{ task_name }}
-
-    - name: Wait for patch installation to complete
-      pause:
-        seconds: 90
-
-    - name: Reboot the server
-      ansible.windows.win_reboot:
-        reboot_timeout: 600
-        test_command: 'powershell -Command "Get-HotFix -Id KB5058921"'
+        cmd.exe /c net use {{ patch_share | regex_replace('\\\\[^\\]+\\[^\\]+\\.*$', '') }} /delete /yes
+      ignore_errors: true
