@@ -1,10 +1,10 @@
 ---
-- name: Install multiple Windows updates from network share using local user
+- name: Install Windows updates from SMB share using local credentials
   hosts: windows
   gather_facts: no
   vars:
     share_path: '\\192.168.29.78\winpatches'
-    drive_letter: 'Z:'
+    drive_letter: 'Z'
     local_user: 'smbuser'
     local_pass: '0pT1mus9r1me#'
     updates:
@@ -13,23 +13,20 @@
 
   tasks:
 
-    - name: Map network drive using net use with local account
+    - name: Install updates from SMB share
       win_shell: |
-        net use {{ drive_letter }} {{ share_path }} /user:"{{ local_user }}" "{{ local_pass }}" /persistent:no
-      register: map_result
-      failed_when: "'The command completed successfully' not in map_result.stdout and map_result.rc != 0"
-      changed_when: false
+        $username = "{{ local_user }}"
+        $password = "{{ local_pass }}"
+        $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
+        $credential = New-Object System.Management.Automation.PSCredential($username, $securePassword)
 
-    - name: Install multiple updates from network share
-      win_shell: |
+        New-PSDrive -Name {{ drive_letter }} -PSProvider FileSystem -Root "{{ share_path }}" -Credential $credential | Out-Null
+
         foreach ($patch in {{ updates | to_json | from_json }}) {
-          Start-Process -FilePath "wusa.exe" -ArgumentList "{{ drive_letter }}\\$patch /quiet /norestart" -Wait
+          Start-Process -FilePath "wusa.exe" -ArgumentList "{{ drive_letter }}:\\$patch /quiet /norestart" -Wait
         }
-      register: install_result
-      failed_when: install_result.rc != 0
-      changed_when: true
 
-    - name: Unmap network drive
-      win_shell: |
-        net use {{ drive_letter }} /delete /y
-      changed_when: false
+        Remove-PSDrive -Name {{ drive_letter }}
+      register: result
+      failed_when: result.rc != 0
+      changed_when: true
