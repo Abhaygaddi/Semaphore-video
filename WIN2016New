@@ -1,3 +1,12 @@
+- name: Install Windows updates from SMB
+  hosts: windows
+  gather_facts: false
+  vars:
+    local_user: smbuser
+    local_pass: "0pT1mus9r1me#"
+    share_path: "\\\\192.168.29.78\\winpatches"
+    drive_letter: Z
+  tasks:
     - name: Install updates from SMB share
       win_shell: |
         $username = "{{ local_user }}"
