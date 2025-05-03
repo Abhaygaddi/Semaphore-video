@@ -1,38 +1,6 @@
----
-- name: Install Windows patches from SMB share with credentials
-  hosts: WIN2016
-  gather_facts: no
-  vars:
-    patch_share: "\\\\192.168.29.78\\winpatches"
-    smb_user: "smbuser"
-    smb_password: "0pT1mus9r1me#"
-    patches:
-      - KB5058921.msu
-      - KB5055521.msu
-
-  tasks:
-    - name: Map network drive with credentials
-      win_shell: |
-        $username = "{{ smb_user }}"
-        $password = "{{ smb_password }}"
-        $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
-        $credential = New-Object System.Management.Automation.PSCredential($username, $securePassword)
-        
-        # Map the drive using New-PSDrive with credentials
-        New-PSDrive -Name Z -PSProvider FileSystem -Root "{{ patch_share }}" -Credential $credential -Persist
-
-    - name: Check if patches are already installed
-      win_shell: |
-        $patches = @("KB5058921", "KB5055521")
-        $installedPatches = Get-HotFix | Select-Object -ExpandProperty HotFixID
-        $missingPatches = $patches | Where-Object { $_ -notin $installedPatches }
-
-        return $missingPatches
-      register: missing_patches
-
     - name: Install patches that are not already installed
       win_shell: |
-        $patches = {{ missing_patches.stdout }}
+        $patches = @("KB5058921", "KB5055521")
         foreach ($patch in $patches) {
           $fullPath = "Z:\\$patch.msu"
           $process = Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -PassThru
@@ -46,10 +14,4 @@
           else {
             Write-Host "Installation of $patch completed successfully"
           }
-        }
-
-    - name: Remove mapped network drive if it exists
-      win_shell: |
-        if (Get-PSDrive -Name Z -ErrorAction SilentlyContinue) {
-            Remove-PSDrive -Name Z
         }
