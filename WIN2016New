@@ -2,6 +2,9 @@
 - name: Patch Windows
   hosts: windows  # Use the 'windows' group from your inventory
   gather_facts: true
+  vars:
+    var_category: "SecurityUpdates"  # Default value
+    var_state: "installed"  # Default value
 
   tasks:
     - name: Check var_category variable
@@ -29,3 +32,15 @@
         skip_optional: true
         state: "{{ var_state }}"
         reboot: true
+      with_items: "{{ windows_servers }}"
+      loop_control:
+        loop_var: windows_server
+      when: windows_server.hostname is defined
+      vars:
+        ansible_host: "{{ windows_server.ip }}"
+        ansible_user: "testdc\\ansible"
+        ansible_password: "0pT1mus9r1me#"
+        ansible_connection: winrm
+        ansible_winrm_transport: ntlm
+        ansible_port: 5985
+        ansible_winrm_server_cert_validation: ignore
