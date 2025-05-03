@@ -1,18 +1,11 @@
----
-- name: Install Windows patch from network share without copying or mapping
-  hosts: windows
-  gather_facts: no
-  vars:
-    patch_share: "\\\\192.168.29.78\\winpatches"
-    patch_file: "KB5058921.msu"
-    smb_user: "testdc\\ansible"
-    smb_password: "0pT1mus9r1me#"
+- name: Ensure no Z drive exists
+  win_shell: |
+    if (Test-Path -Path "Z:\") {
+      net use Z: /delete
+    }
 
-  tasks:
-    - name: Map network drive with credentials
-      ansible.windows.win_shell: |
-        net use Z: "{{ patch_share }}" /user:{{ smb_user }} {{ smb_password }}
-        Start-Process -FilePath "wusa.exe" -ArgumentList "Z:\\{{ patch_file }} /quiet /norestart" -Wait
-        net use Z: /delete
-      register: patch_result
-      failed_when: patch_result.rc != 0
+- name: Map network drive with credentials
+  win_shell: |
+    net use Z: "\\\\192.168.29.78\\winpatches" /user:testdc\ansible "0pT1mus9r1me#"
+    Start-Process -FilePath "wusa.exe" -ArgumentList "Z:\\KB5058921.msu /quiet /norestart" -Wait
+    net use Z: /delete
