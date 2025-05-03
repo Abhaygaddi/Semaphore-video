@@ -21,14 +21,23 @@
         # Map the drive using New-PSDrive with credentials
         New-PSDrive -Name Z -PSProvider FileSystem -Root "{{ patch_share }}" -Credential $credential -Persist
 
-    - name: Install each .msu patch directly from SMB share and wait for completion
+    - name: Check if patches are already installed
       win_shell: |
-        $patches = @("KB5058921.msu", "KB5055521.msu")
+        $patches = @("KB5058921", "KB5055521")
+        $installedPatches = Get-HotFix | Select-Object -ExpandProperty HotFixID
+        $missingPatches = $patches | Where-Object { $_ -notin $installedPatches }
+
+        return $missingPatches
+      register: missing_patches
+
+    - name: Install patches that are not already installed
+      win_shell: |
+        $patches = {{ missing_patches.stdout }}
         foreach ($patch in $patches) {
-          $fullPath = "Z:\\$patch"
+          $fullPath = "Z:\\$patch.msu"
           $process = Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -PassThru
           $process.WaitForExit()
-          
+
           # Check if installation was successful
           if ($process.ExitCode -ne 0) {
             Write-Host "Installation of $patch failed with exit code $($process.ExitCode)"
