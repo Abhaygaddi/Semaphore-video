@@ -23,7 +23,7 @@
 
     - name: Install each .msu patch directly from SMB share
       win_shell: |
-        $patches = {{ patches | to_json }}
+        $patches = @("KB5058921.msu", "KB5055521.msu")
         foreach ($patch in $patches) {
           $fullPath = "Z:\\$patch"
           Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -Wait
