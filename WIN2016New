@@ -3,7 +3,7 @@
   tasks:
     - name: Ensure no Z drive exists
       win_shell: |
-        if (Test-Path -Path "Z:\") {
+        if (Test-Path -Path "Z:\\") {
           net use Z: /delete
         }
 
