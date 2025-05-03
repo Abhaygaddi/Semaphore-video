@@ -18,15 +18,16 @@
         }
 
     - name: Map network drive Z: to patch share
-      win_shell: >
+      win_shell: |
         net use {{ drive_letter }} "{{ share_path }}" /user:"{{ share_user }}" "{{ share_pass }}"
 
     - name: Install all MSU patches from share
       win_shell: |
         $patches = Get-ChildItem -Path "{{ drive_letter }}\\" -Filter *.msu
         foreach ($patch in $patches) {
-          Start-Process -FilePath wusa.exe -ArgumentList "`"$($patch.FullName)`" /quiet /norestart" -Wait
+            Start-Process -FilePath "wusa.exe" -ArgumentList "`"$($patch.FullName)`" /quiet /norestart" -Wait
         }
 
     - name: Unmap Z: drive
-      win_shell: net use {{ drive_letter }} /delete /y
+      win_shell: |
+        net use {{ drive_letter }} /delete /y
