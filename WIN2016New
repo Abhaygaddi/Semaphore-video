@@ -1,6 +1,5 @@
-
 ---
-- name: Patch Windows
+- name: Patch Windows using Network Share
   hosts: all
   gather_facts: true
 
@@ -10,7 +9,7 @@
         that:
           - var_category in ["SecurityUpdates", "CriticalUpdates", "UpdateRollups", "*"]
         fail_msg: >-
-          var_category must be one of 'SecurityUpdates', 'CriticalUpdates', 'UpdateRollups' or '*.'
+          var_category must be one of 'SecurityUpdates', 'CriticalUpdates', 'UpdateRollups' or '*.' 
           It is set to {{ var_category }}.
         success_msg: "patch category is set to {{ var_category }}."
 
@@ -23,7 +22,23 @@
           It is set to {{ var_state }}.
         success_msg: "patch state is set to {{ var_state }}."
 
-    - name: Patch Windows hosts
+    - name: Map network drive for patches
+      ansible.windows.win_shell: |
+        net use Z: "\\\\192.168.29.78\\winpatches" /user:testdc\\ansible "{{ ansible_password }}"
+      register: network_drive
+      ignore_errors: yes
+
+    - name: Install patch from network share
+      ansible.windows.win_shell: |
+        Start-Process -FilePath "wusa.exe" -ArgumentList "Z:\\KB5058921.msu /quiet /norestart" -Wait
+      when: network_drive.changed
+
+    - name: Remove mapped network drive
+      ansible.windows.win_shell: |
+        net use Z: /delete
+      when: network_drive.changed
+
+    - name: Apply updates to Windows hosts
       ansible.windows.win_updates:
         category_names: "{{ var_category }}"
         log_path: "{{ log_dir }}"
