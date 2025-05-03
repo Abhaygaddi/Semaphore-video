@@ -15,9 +15,8 @@
         $pass = "{{ smb_password }}"
         $securePass = ConvertTo-SecureString $pass -AsPlainText -Force
         $cred = New-Object System.Management.Automation.PSCredential($user, $securePass)
-        $net = New-Object -ComObject WScript.Network
-        $net.MapNetworkDrive("Z:", "{{ patch_share }}", $false, $user, $pass)
-        Start-Process -FilePath "wusa.exe" -ArgumentList "Z:\{{ patch_file }} /quiet /norestart" -Wait
-        $net.RemoveNetworkDrive("Z:")
+        New-PSDrive -Name Z -PSProvider FileSystem -Root "{{ patch_share }}" -Persist -Credential $cred
+        Start-Process -FilePath "wusa.exe" -ArgumentList "Z:\\{{ patch_file }} /quiet /norestart" -Wait
+        Remove-PSDrive -Name Z
       register: patch_result
       failed_when: patch_result.rc != 0
