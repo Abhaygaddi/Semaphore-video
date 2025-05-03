@@ -9,14 +9,10 @@
     smb_password: "0pT1mus9r1me#"
 
   tasks:
-    - name: Install patch using UNC path with credentials
+    - name: Map network drive with credentials
       ansible.windows.win_shell: |
-        $user = "{{ smb_user }}"
-        $pass = "{{ smb_password }}"
-        $securePass = ConvertTo-SecureString $pass -AsPlainText -Force
-        $cred = New-Object System.Management.Automation.PSCredential($user, $securePass)
-        New-PSDrive -Name Z -PSProvider FileSystem -Root "{{ patch_share }}" -Persist -Credential $cred
+        net use Z: "{{ patch_share }}" /user:{{ smb_user }} {{ smb_password }}
         Start-Process -FilePath "wusa.exe" -ArgumentList "Z:\\{{ patch_file }} /quiet /norestart" -Wait
-        Remove-PSDrive -Name Z
+        net use Z: /delete
       register: patch_result
       failed_when: patch_result.rc != 0
