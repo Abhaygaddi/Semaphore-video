@@ -1,30 +1,18 @@
-- name: Install Windows patch from SMB share without copying or scheduled task
-  hosts: WIN2016
+---
+- name: Install Windows patch from network share without copying or mapping
+  hosts: windows
   gather_facts: no
   vars:
-    smb_share: "\\\\192.168.29.78\\winpatches"
-    patch_file: "KB5058921.msu"
-    drive_letter: "Z:"
-    smb_user: "smbuser"
-    smb_password: "0pT1mus9r1me#"
+    patch_path: "\\\\192.168.29.78\\winpatches\\KB5058921.msu"
 
   tasks:
-
-    - name: "Map network drive Z: with Samba credentials"
+    - name: Install Windows patch using wusa from UNC path
       ansible.windows.win_command:
-        cmd: "cmd.exe /c net use {{ drive_letter }} {{ smb_share }} {{ smb_password }} /user:{{ smb_user }}"
-      register: map_result
-      changed_when: "'The command completed successfully' in map_result.stdout"
-      failed_when: "'Access is denied' in map_result.stdout"
+        cmd: 'cmd.exe /c wusa.exe "{{ patch_path }}" /quiet /norestart'
+      register: patch_result
+      failed_when: patch_result.rc != 0
+      changed_when: patch_result.rc == 0
 
-    - name: "Install patch from mapped drive"
-      ansible.windows.win_command:
-        cmd: "cmd.exe /c wusa.exe {{ drive_letter }}\\{{ patch_file }} /quiet /norestart"
-      register: install_result
-      failed_when: install_result.rc != 0
-      changed_when: install_result.rc == 0
-
-    - name: "Unmap network drive Z:"
-      ansible.windows.win_command:
-        cmd: "cmd.exe /c net use {{ drive_letter }} /delete /yes"
-      ignore_errors: true
+    - name: Show patch installation result
+      debug:
+        var: patch_result
