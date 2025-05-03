@@ -1,18 +1,3 @@
----
-- name: Install Windows updates from SMB share using local credentials
-  hosts: windows
-  gather_facts: no
-  vars:
-    share_path: '\\192.168.29.78\winpatches'
-    drive_letter: 'Z'
-    local_user: 'smbuser'
-    local_pass: '0pT1mus9r1me#'
-    updates:
-      - KB5058921.msu
-      - KB5055521.msu
-
-  tasks:
-
     - name: Install updates from SMB share
       win_shell: |
         $username = "{{ local_user }}"
@@ -22,7 +7,8 @@
 
         New-PSDrive -Name {{ drive_letter }} -PSProvider FileSystem -Root "{{ share_path }}" -Credential $credential | Out-Null
 
-        foreach ($patch in {{ updates | to_json | from_json }}) {
+        $patches = @('KB5058921.msu', 'KB5055521.msu')
+        foreach ($patch in $patches) {
           Start-Process -FilePath "wusa.exe" -ArgumentList "{{ drive_letter }}:\\$patch /quiet /norestart" -Wait
         }
 
