@@ -1,32 +1,22 @@
 ---
-- name: Install Windows patches from network share
+- name: Install Windows patch from network share without copying or mapping
   hosts: windows
-  gather_facts: false
-
+  gather_facts: no
   vars:
-    share_path: "\\\\192.168.29.78\\winpatches"
-    drive_letter: "Z:"
-    share_user: "testdc\\ansible"
-    share_pass: "0pT1mus9r1me#"
+    patch_share: "\\\\192.168.29.78\\winpatches"
+    patch_file: "KB5058921.msu"
+    smb_user: "smbuser"
+    smb_password: "0pT1mus9r1me#"
 
   tasks:
-    - name: Ensure Z: drive is not already mapped
-      win_shell: |
-        if (Test-Path "{{ drive_letter }}\") {
-            net use {{ drive_letter }} /delete /y
-        }
-
-    - name: Map network drive Z: to patch share
-      win_shell: |
-        net use {{ drive_letter }} "{{ share_path }}" /user:"{{ share_user }}" "{{ share_pass }}"
-
-    - name: Install all MSU patches from share
-      win_shell: |
-        $patches = Get-ChildItem -Path "{{ drive_letter }}\" -Filter *.msu
-        foreach ($patch in $patches) {
-            Start-Process -FilePath "wusa.exe" -ArgumentList "`"$($patch.FullName)`" /quiet /norestart" -Wait
-        }
-
-    - name: Unmap Z: drive
-      win_shell: |
-        net use {{ drive_letter }} /delete /y
+    - name: Install patch using UNC path with credentials
+      ansible.windows.win_shell: |
+        $user = "{{ smb_user }}"
+        $pass = "{{ smb_password }}"
+        $securePass = ConvertTo-SecureString $pass -AsPlainText -Force
+        $cred = New-Object System.Management.Automation.PSCredential($user, $securePass)
+        New-PSDrive -Name Z -PSProvider FileSystem -Root "{{ patch_share }}" -Persist -Credential $cred
+        Start-Process -FilePath "wusa.exe" -ArgumentList "Z:\\{{ patch_file }} /quiet /norestart" -Wait
+        Remove-PSDrive -Name Z
+      register: patch_result
+      failed_when: patch_result.rc != 0
