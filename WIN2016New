@@ -12,8 +12,8 @@
   tasks:
 
     - name: Ensure Z: drive is not already mapped
-      win_shell: >
-        if (Test-Path "{{ drive_letter }}\\") {
+      win_shell: |
+        if (Test-Path "{{ drive_letter }}\") {
             net use {{ drive_letter }} /delete /y
         }
 
@@ -24,9 +24,9 @@
       failed_when: "'Access is denied.' in net_use_result.stderr"
 
     - name: Install all MSU patches from share
-      win_shell: >
+      win_shell: |
         Get-ChildItem -Path {{ drive_letter }}\ -Filter *.msu |
-        ForEach-Object { wusa.exe "$($_.FullName)" /quiet /norestart }
+        ForEach-Object { Start-Process -FilePath wusa.exe -ArgumentList "`"$($_.FullName)`" /quiet /norestart" -Wait }
 
     - name: Unmap Z: drive
       win_shell: net use {{ drive_letter }} /delete /y
