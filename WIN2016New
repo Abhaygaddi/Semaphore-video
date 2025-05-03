@@ -21,12 +21,22 @@
         # Map the drive using New-PSDrive with credentials
         New-PSDrive -Name Z -PSProvider FileSystem -Root "{{ patch_share }}" -Credential $credential -Persist
 
-    - name: Install each .msu patch directly from SMB share
+    - name: Install each .msu patch directly from SMB share and wait for completion
       win_shell: |
         $patches = @("KB5058921.msu", "KB5055521.msu")
         foreach ($patch in $patches) {
           $fullPath = "Z:\\$patch"
-          Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -Wait
+          $process = Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -PassThru
+          $process.WaitForExit()
+          
+          # Check if installation was successful
+          if ($process.ExitCode -ne 0) {
+            Write-Host "Installation of $patch failed with exit code $($process.ExitCode)"
+            exit 1
+          }
+          else {
+            Write-Host "Installation of $patch completed successfully"
+          }
         }
 
     - name: Remove mapped network drive if it exists
