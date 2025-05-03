@@ -1,22 +1,31 @@
 ---
-- name: Install Windows patch from network share without copying or mapping
+- name: Install Windows updates from network share using local user
   hosts: windows
   gather_facts: no
   vars:
-    patch_share: "\\\\192.168.29.78\\winpatches"
-    patch_file: "KB5058921.msu"
-    smb_user: "smbuser"
-    smb_password: "0pT1mus9r1me#"
+    share_path: "\\192.168.29.78\winpatches"
+    update_file: "KB5058921.msu"
+    drive_letter: "Z:"
+    local_user: "smbuser"
+    local_pass: "0pT1mus9r1me#"
 
   tasks:
-    - name: Install patch using UNC path with credentials
-      ansible.windows.win_shell: |
-        $user = "{{ smb_user }}"
-        $pass = "{{ smb_password }}"
-        $securePass = ConvertTo-SecureString $pass -AsPlainText -Force
-        $cred = New-Object System.Management.Automation.PSCredential($user, $securePass)
-        New-PSDrive -Name Z -PSProvider FileSystem -Root "{{ patch_share }}" -Persist -Credential $cred
-        Start-Process -FilePath "wusa.exe" -ArgumentList "Z:\\{{ patch_file }} /quiet /norestart" -Wait
-        Remove-PSDrive -Name Z
-      register: patch_result
-      failed_when: patch_result.rc != 0
+
+    - name: Map network drive using net use with local account
+      win_shell: |
+        net use {{ drive_letter }} {{ share_path }} /user:"{{ local_user }}" "{{ local_pass }}" /persistent:no
+      register: map_result
+      failed_when: "'The command completed successfully' not in map_result.stdout and map_result.rc != 0"
+      changed_when: false
+
+    - name: Install update from network share
+      win_shell: |
+        Start-Process -FilePath "wusa.exe" -ArgumentList "{{ drive_letter }}\\{{ update_file }} /quiet /norestart" -Wait
+      register: install_result
+      failed_when: install_result.rc != 0
+      changed_when: true
+
+    - name: Unmap network drive
+      win_shell: |
+        net use {{ drive_letter }} /delete /y
+      changed_when: false
