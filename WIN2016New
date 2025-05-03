@@ -11,8 +11,9 @@
 
   tasks:
 
-         win_shell: |
-        if (Test-Path "{{ drive_letter }}\") {
+    - name: Ensure Z: drive is not already mapped
+      win_shell: |
+        if (Test-Path "{{ drive_letter }}\\") {
             net use {{ drive_letter }} /delete /y
         }
 
@@ -22,7 +23,7 @@
 
     - name: Install all MSU patches from share
       win_shell: |
-        $patches = Get-ChildItem -Path "{{ drive_letter }}\" -Filter *.msu
+        $patches = Get-ChildItem -Path "{{ drive_letter }}\\" -Filter *.msu
         foreach ($patch in $patches) {
           Start-Process -FilePath wusa.exe -ArgumentList "`"$($patch.FullName)`" /quiet /norestart" -Wait
         }
