@@ -1,47 +1,33 @@
 ---
-- name: Patch Windows
+- name: Install Windows patches from network share
   hosts: windows
-  gather_facts: true
+  gather_facts: false
+
   vars:
-    var_category: "SecurityUpdates"
-    var_state: "installed"
-    log_dir: "C:\\Windows\\Temp\\patch_logs"  # Define log directory
+    share_path: "\\\\192.168.29.78\\winpatches"
+    drive_letter: "Z:"
+    share_user: "testdc\\ansible"
+    share_pass: "0pT1mus9r1me#"
 
   tasks:
-    - name: Check var_category variable
-      ansible.builtin.assert:
-        that:
-          - var_category in ["SecurityUpdates", "CriticalUpdates", "UpdateRollups", "*"]
-        fail_msg: >-
-          var_category must be one of 'SecurityUpdates', 'CriticalUpdates', 'UpdateRollups' or '*.'
-          It is set to {{ var_category }}.
-        success_msg: "patch category is set to {{ var_category }}."
 
-    - name: Check var_state variable
-      ansible.builtin.assert:
-        that:
-          - var_state in ["installed", "searched", "downloaded"]
-        fail_msg: >-
-          var_state must be one of 'installed', 'searched', or 'downloaded.'
-          It is set to {{ var_state }}.
-        success_msg: "patch state is set to {{ var_state }}."
+    - name: Ensure Z: drive is not already mapped
+      win_shell: |
+        if (Test-Path "{{ drive_letter }}\") {
+            net use {{ drive_letter }}: /delete /y
+        }
 
-    - name: Patch Windows hosts
-      ansible.windows.win_updates:
-        category_names: "{{ var_category }}"
-        log_path: "{{ log_dir }}"  # Log directory is now defined
-        skip_optional: true
-        state: "{{ var_state }}"
-        reboot: true
-      with_items: "{{ windows_servers }}"
-      loop_control:
-        loop_var: windows_server
-      when: windows_server.hostname is defined
-      vars:
-        ansible_host: "{{ windows_server.ip }}"
-        ansible_user: "testdc\\ansible"
-        ansible_password: "0pT1mus9r1me#"
-        ansible_connection: winrm
-        ansible_winrm_transport: ntlm
-        ansible_port: 5985
-        ansible_winrm_server_cert_validation: ignore
+    - name: Map network drive Z: to patch share
+      win_shell: |
+        net use {{ drive_letter }}: "{{ share_path }}" /user:{{ share_user }} {{ share_pass }}
+      register: net_use_result
+      failed_when: "'Access is denied.' in net_use_result.stderr"
+
+    - name: Install all MSU patches from share
+      win_shell: |
+        Get-ChildItem -Path {{ drive_letter }}:\ -Filter *.msu | ForEach-Object {
+          wusa.exe "$($_.FullName)" /quiet /norestart
+        }
+
+    - name: Unmap Z: drive
+      win_shell: net use {{ drive_letter }}: /delete /y
