@@ -10,7 +10,6 @@
     smb_password: "0pT1mus9r1me#"
 
   tasks:
-
     - name: Map network drive Z:
       ansible.windows.win_command: >
         cmd.exe /c net use {{ patch_drive }} {{ patch_share }} /user:{{ smb_user }} "{{ smb_password }}"
