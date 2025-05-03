@@ -5,7 +5,7 @@
   vars:
     patch_share: "\\\\192.168.29.78\\winpatches"
     patch_file: "KB5058921.msu"
-    smb_user: "testdc\\ansible"
+    smb_user: "testdc\ansible"
     smb_password: "0pT1mus9r1me#"
 
   tasks:
