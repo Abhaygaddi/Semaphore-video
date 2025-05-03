@@ -9,6 +9,6 @@
 
     - name: Map network drive with credentials
       win_shell: |
-        net use Z: "\\\\192.168.29.78\\winpatches" /user:testdc\ansible "0pT1mus9r1me#"
+        net use Z: "\\\\192.168.29.78\\winpatches" /user:testdc\\ansible "0pT1mus9r1me#"
         Start-Process -FilePath "wusa.exe" -ArgumentList "Z:\\KB5058921.msu /quiet /norestart" -Wait
         net use Z: /delete
