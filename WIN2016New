@@ -1,27 +1,33 @@
-- name: Install Windows updates from SMB
-  hosts: windows
-  gather_facts: false
+---
+- name: Install Windows patches from SMB share with credentials
+  hosts: WIN2016
+  gather_facts: no
   vars:
-    local_user: smbuser
-    local_pass: "0pT1mus9r1me#"
-    share_path: "\\\\192.168.29.78\\winpatches"
-    drive_letter: Z
+    patch_share: "\\\\192.168.29.78\\winpatches"
+    smb_user: "smbuser"
+    smb_password: "0pT1mus9r1me#"
+    patches:
+      - KB5058921.msu
+      - KB5055521.msu
+
   tasks:
-    - name: Install updates from SMB share
+    - name: Map network drive with credentials
       win_shell: |
-        $username = "{{ local_user }}"
-        $password = "{{ local_pass }}"
+        $username = "{{ smb_user }}"
+        $password = "{{ smb_password }}"
         $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
         $credential = New-Object System.Management.Automation.PSCredential($username, $securePassword)
+        
+        # Map the drive using New-PSDrive with credentials
+        New-PSDrive -Name Z -PSProvider FileSystem -Root "{{ patch_share }}" -Credential $credential -Persist
 
-        New-PSDrive -Name {{ drive_letter }} -PSProvider FileSystem -Root "{{ share_path }}" -Credential $credential | Out-Null
-
-        $patches = @('KB5058921.msu', 'KB5055521.msu')
+    - name: Install each .msu patch directly from SMB share
+      win_shell: |
+        $patches = {{ patches | to_json }}
         foreach ($patch in $patches) {
-          Start-Process -FilePath "wusa.exe" -ArgumentList "{{ drive_letter }}:\\$patch /quiet /norestart" -Wait
+          $fullPath = "Z:\\$patch"
+          Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -Wait
         }
 
-        Remove-PSDrive -Name {{ drive_letter }}
-      register: result
-      failed_when: result.rc != 0
-      changed_when: true
+    - name: Remove mapped network drive
+      win_shell: Remove-PSDrive -Name Z
