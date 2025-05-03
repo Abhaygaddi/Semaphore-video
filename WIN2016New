@@ -11,8 +11,7 @@
 
   tasks:
 
-    - name: Ensure Z: drive is not already mapped
-      win_shell: |
+         win_shell: |
         if (Test-Path "{{ drive_letter }}\") {
             net use {{ drive_letter }} /delete /y
         }
