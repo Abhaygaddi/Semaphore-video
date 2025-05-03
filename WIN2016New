@@ -19,14 +19,14 @@
 
     - name: Map network drive Z: to patch share
       win_shell: >
-        net use {{ drive_letter }} "{{ share_path }}" /user:{{ share_user }} {{ share_pass }}
-      register: net_use_result
-      failed_when: "'Access is denied.' in net_use_result.stderr"
+        net use {{ drive_letter }} "{{ share_path }}" /user:"{{ share_user }}" "{{ share_pass }}"
 
     - name: Install all MSU patches from share
       win_shell: |
-        Get-ChildItem -Path {{ drive_letter }}\ -Filter *.msu |
-        ForEach-Object { Start-Process -FilePath wusa.exe -ArgumentList "`"$($_.FullName)`" /quiet /norestart" -Wait }
+        $patches = Get-ChildItem -Path "{{ drive_letter }}\" -Filter *.msu
+        foreach ($patch in $patches) {
+          Start-Process -FilePath wusa.exe -ArgumentList "`"$($patch.FullName)`" /quiet /norestart" -Wait
+        }
 
     - name: Unmap Z: drive
       win_shell: net use {{ drive_letter }} /delete /y
