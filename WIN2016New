@@ -14,9 +14,20 @@
         letter: Z
         path: '\\192.168.29.78\winpatches'
         state: present
-        user: 'testdc\\ansible'
+        user: 'TESTDC\\ansible'
         password: '0pT1mus9r1me#'
         persistent: no
+
+    - name: Verify if drive Z: is mapped
+      win_shell: |
+        if (!(Test-Path Z:\)) {
+          Write-Host "Drive Z: not mapped"
+          exit 1
+        } else {
+          Write-Host "Drive Z: mapped successfully"
+        }
+      register: drive_check
+      failed_when: drive_check.rc != 0
 
     - name: Install patches from Z: and log results
       win_shell: |
