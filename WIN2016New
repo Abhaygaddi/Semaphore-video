@@ -1,57 +1,23 @@
 ---
-- name: Install Windows patches from temporary Linux SMB share
+- name: Install Windows patches from Linux SMB share
   hosts: windows
   gather_facts: no
-  become: yes
-  become_method: runas
-  become_user: SYSTEM
 
   vars:
-    smb_user: "testdc\\ansible"
-    smb_pass: "0pT1mus9r1me#"
-    smb_share: "\\\\192.168.29.78\\winpatches"
-    patches:
-      - "KB5058921"
-      - "KB5055521"
+    smb_user: 'testdc\\ansible'
+    smb_pass: '0pT1mus9r1me#'
+    smb_share: '\\\\192.168.29.78\\winpatches'
 
   tasks:
 
-    - name: Map Linux SMB share to temporary Z: drive
+    - name: Map SMB share as Z: drive
       win_shell: >
         net use Z: "{{ smb_share }}" /user:"{{ smb_user }}" "{{ smb_pass }}" /persistent:no
-      register: map_output
-      changed_when: false
-      failed_when: "'error' in map_output.stdout.lower()"
 
-    - name: Install patches from Z: drive
-      win_shell: |
-        $patches = @{{ patches | to_json }}
-        foreach ($patch in $patches) {
-          $path = "Z:\\$patch.msu"
-          if (Test-Path $path) {
-            $proc = Start-Process -FilePath "wusa.exe" -ArgumentList "$path /quiet /norestart" -PassThru
-            $proc.WaitForExit()
-            if ($proc.ExitCode -eq 3) {
-              Write-Host "Patch $patch is not applicable or already installed"
-            } elseif ($proc.ExitCode -ne 0) {
-              Write-Host "Patch $patch failed with exit code $($proc.ExitCode)"
-              net use Z: /delete
-              exit 1
-            } else {
-              Write-Host "Patch $patch installed successfully"
-            }
-          } else {
-            Write-Host "Patch file not found: $path"
-            net use Z: /delete
-            exit 1
-          }
-        }
-        net use Z: /delete
-      register: patch_output
-      failed_when: patch_output.rc != 0 and
-                   "'exit code 3'" not in patch_output.stdout and
-                   "'exit code 3010'" not in patch_output.stdout
+    - name: Install patch from Z: drive
+      win_shell: >
+        wusa.exe Z:\patchfile.msu /quiet /norestart
 
-    - name: Ensure Z: drive is unmounted (cleanup)
+    - name: Unmap Z: drive
       win_shell: net use Z: /delete
       ignore_errors: yes
