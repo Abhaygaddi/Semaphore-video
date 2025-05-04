@@ -2,6 +2,7 @@
 - name: Map drive and install patches
   hosts: windows
   gather_facts: yes
+  
   tasks:
     - name: Map network drive Z
       win_mapped_drive:
@@ -22,12 +23,12 @@
       when: "'Z:' not in net_use_status.stdout"
 
     - name: Install patch KB5055521
-      win_command: "msiexec /i Z:\\KB5055521.msu /quiet /norestart"
+      win_command: "wusa Z:\\KB5055521.msu /quiet /norestart"
       register: install_kb5055521
       ignore_errors: yes
 
     - name: Install patch KB5058921
-      win_command: "msiexec /i Z:\\KB5058921.msu /quiet /norestart"
+      win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
       register: install_kb5058921
       ignore_errors: yes
 
