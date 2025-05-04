@@ -1,12 +1,40 @@
 ---
-- name: Map drive and install patches
-  hosts: windows
+- name: Install Windows patches from network share
+  hosts: WIN2016
   gather_facts: no
   tasks:
+
+    - name: Ensure C:\Temp directory exists
+      win_file:
+        path: C:\Temp
+        state: directory
+
     - name: Map network drive Z
       win_mapped_drive:
         letter: Z
-        path: "\\\\192.168.29.78\\winpatches"
-        state: present
+        path: "\\192.168.29.78\\winpatches"
         username: "testdc\\ansible"
         password: "0pT1mus9r1me#"
+        state: present
+
+    - name: Install patches from network share and log result
+      win_command: "wusa.exe Z:\\{{ item }}.msu /quiet /norestart"
+      loop:
+        - KB5055521
+        - KB5058921
+      register: patch_results
+      ignore_errors: yes
+
+    - name: Log patch installation results
+      win_lineinfile:
+        path: C:\Temp\patch_log.txt
+        create: yes
+        line: |
+          {{ ansible_date_time.iso8601 }} : {{ item.item }} : {{
+            'SUCCESS' if item.rc == 0 else 'FAILED with code ' ~ item.rc }} : {{
+            item.stderr if item.stderr else 'No error message' }}
+      loop: "{{ patch_results.results }}"
+
+    - name: Reboot if any patch installed successfully
+      win_reboot:
+      when: patch_results.results | selectattr('rc', 'equalto', 0) | list | length > 0
