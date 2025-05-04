@@ -5,8 +5,8 @@
   vars:
     patch_share: "\\\\192.168.29.78\\winpatches"
     patches:
-      - KB5055521.msu
-      - KB5058921.msu
+      - KB5055521
+      - KB5058921
     log_path: "C:\\Temp\\patch_log.txt"
 
   tasks:
@@ -16,16 +16,23 @@
         path: "C:\\Temp"
         state: directory
 
-    - name: Install each patch and log results
+    - name: Install patches and verify with Get-HotFix
       win_shell: |
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        $patch = "{{ item }}"
-        $patchPath = "{{ patch_share }}\\$patch"
+        $kb = "{{ item }}"
+        $patchPath = "{{ patch_share }}\\$kb.msu"
+
         try {
           Start-Process -FilePath "wusa.exe" -ArgumentList "`"$patchPath`" /quiet /norestart" -Wait -ErrorAction Stop
-          Add-Content -Path "{{ log_path }}" -Value "$timestamp : $patch : SUCCESS"
+          Start-Sleep -Seconds 20
+          $installed = Get-HotFix -Id $kb -ErrorAction SilentlyContinue
+          if ($installed) {
+            Add-Content -Path "{{ log_path }}" -Value "$timestamp : $kb : SUCCESS"
+          } else {
+            Add-Content -Path "{{ log_path }}" -Value "$timestamp : $kb : INSTALL ATTEMPTED BUT NOT FOUND IN SYSTEM"
+          }
         } catch {
-          Add-Content -Path "{{ log_path }}" -Value "$timestamp : $patch : FAILED - $($_.Exception.Message)"
+          Add-Content -Path "{{ log_path }}" -Value "$timestamp : $kb : FAILED - $($_.Exception.Message)"
         }
       loop: "{{ patches }}"
 
