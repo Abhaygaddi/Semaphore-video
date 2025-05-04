@@ -1,23 +1,23 @@
 ---
-- name: Install Windows patches from Linux SMB share
-  hosts: windows
-  gather_facts: no
-  vars:
-    smb_user: 'testdc\\ansible'
-    smb_pass: '0pT1mus9r1me#'
-    smb_share: '\\\\192.168.29.78\\winpatches'
-    patch_file: 'KB5058921.msu'
-
+- hosts: 192.168.29.78
+  become: yes  # Required for applying patches with elevated privileges
   tasks:
+    - name: Map the network drive
+      win_mapped_drive:
+        name: Z:
+        path: \\192.168.29.78\\winpatches'
+        state: present
+        user: testdc\\ansible
+        password: 0pT1mus9r1me#
+        persistent: yes
 
-    - name: Map SMB share as Z: drive
-      win_shell: >
-        net use Z: "{{ smb_share }}" /user:"{{ smb_user }}" "{{ smb_pass }}" /persistent:no
+    - name: Apply patches
+      ansible.posix.patch:
+        path: Z:\\192.168.29.78\\winpatches\KB50508921.msu
+        apply_prefix: /opt/my_app
+        directory: /opt/my_app
 
-    - name: Install patch from Z: drive
-      win_shell: >
-        wusa.exe Z:\{{ patch_file }} /quiet /norestart
-
-    - name: Unmap Z: drive
-      win_shell: net use Z: /delete
-      ignore_errors: yes
+    - name: Unmap the network drive
+      win_mapped_drive:
+        name: Z:
+        state: absent
