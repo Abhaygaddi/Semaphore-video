@@ -28,3 +28,10 @@
           Add-Content -Path "{{ log_path }}" -Value "$timestamp : $patch : FAILED - $($_.Exception.Message)"
         }
       loop: "{{ patches }}"
+
+    - name: Reboot the server after patching
+      win_reboot:
+        reboot_timeout: 600
+        msg: "Rebooting after patch installation"
+        pre_reboot_delay: 10
+        post_reboot_delay: 30
