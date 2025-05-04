@@ -9,10 +9,10 @@
   vars:
     smb_user: "testdc\\ansible"
     smb_pass: "0pT1mus9r1me#"
-    smb_share: "\\\\192.168.29.78\\winpatches"  # Linux Samba share IP
+    smb_share: "\\\\192.168.29.78\\winpatches"
     patches:
-      - KB5058921
-      - KB5055521
+      - "KB5058921"
+      - "KB5055521"
 
   tasks:
     - name: Map Linux SMB share to temporary Z: drive
@@ -24,7 +24,7 @@
 
     - name: Install patches from Z: drive
       win_shell: |
-        $patches = {{ patches | to_json | from_json }}
+        $patches = {{ patches | to_nice_json }}
         foreach ($patch in $patches) {
           $path = "Z:\\$patch.msu"
           if (Test-Path $path) {
