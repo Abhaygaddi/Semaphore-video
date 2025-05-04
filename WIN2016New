@@ -1,28 +1,26 @@
 ---
-- name: Install Windows patch from SMB share
-  hosts: 192.168.29.78
+- name: Install patch from Linux SMB share
+  hosts: windows
   gather_facts: no
   vars:
-    smb_path: "\\\\192.168.29.78\\winpatches"
     smb_user: "testdc\\ansible"
-    smb_pass: "0pT1mus9r1me#"
-    patch_file: "KB50508921.msu"
+    smb_password: "0pT1mus9r1me#"
+    patch_path: "Z:\\KB50508921.msu"
 
   tasks:
     - name: Map network drive Z:
       win_mapped_drive:
-        name: Z:
-        path: "{{ smb_path }}"
+        name: "Z:"
+        path: "\\\\192.168.29.78\\winpatches"
         state: present
         user: "{{ smb_user }}"
-        password: "{{ smb_pass }}"
+        password: "{{ smb_password }}"
         persistent: no
 
-    - name: Install patch using wusa
-      win_shell: >
-        wusa.exe Z:\{{ patch_file }} /quiet /norestart
+    - name: Install Windows update patch from Z:
+      win_command: "wusa.exe {{ patch_path }} /quiet /norestart"
 
     - name: Unmap network drive Z:
       win_mapped_drive:
-        name: Z:
+        name: "Z:"
         state: absent
