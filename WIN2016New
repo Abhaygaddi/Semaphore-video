@@ -16,8 +16,15 @@
         path: "C:\\Temp"
         state: directory
 
-    - name: Loop through patches
-      include_tasks: install_and_log_patch.yml
+    - name: Install each patch and log results
+      win_shell: |
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        $patch = "{{ item }}"
+        $patchPath = "{{ patch_share }}\\$patch"
+        try {
+          Start-Process -FilePath "wusa.exe" -ArgumentList "`"$patchPath`" /quiet /norestart" -Wait -ErrorAction Stop
+          Add-Content -Path "{{ log_path }}" -Value "$timestamp : $patch : SUCCESS"
+        } catch {
+          Add-Content -Path "{{ log_path }}" -Value "$timestamp : $patch : FAILED - $($_.Exception.Message)"
+        }
       loop: "{{ patches }}"
-      loop_control:
-        loop_var: patch_file
