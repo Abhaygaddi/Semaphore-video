@@ -15,16 +15,17 @@
       - "KB5055521"
 
   tasks:
+
     - name: Map Linux SMB share to temporary Z: drive
       win_shell: >
-        cmd.exe /c "net use Z: {{ smb_share }} /user:{{ smb_user }} {{ smb_pass }} /persistent:no"
+        net use Z: "{{ smb_share }}" /user:"{{ smb_user }}" "{{ smb_pass }}" /persistent:no
       register: map_output
       changed_when: false
       failed_when: "'error' in map_output.stdout.lower()"
 
     - name: Install patches from Z: drive
       win_shell: |
-        $patches = {{ patches | to_nice_json }}
+        $patches = @{{ patches | to_json }}
         foreach ($patch in $patches) {
           $path = "Z:\\$patch.msu"
           if (Test-Path $path) {
@@ -34,23 +35,23 @@
               Write-Host "Patch $patch is not applicable or already installed"
             } elseif ($proc.ExitCode -ne 0) {
               Write-Host "Patch $patch failed with exit code $($proc.ExitCode)"
-              cmd.exe /c "net use Z: /delete"
+              net use Z: /delete
               exit 1
             } else {
               Write-Host "Patch $patch installed successfully"
             }
           } else {
             Write-Host "Patch file not found: $path"
-            cmd.exe /c "net use Z: /delete"
+            net use Z: /delete
             exit 1
           }
         }
-        cmd.exe /c "net use Z: /delete"
+        net use Z: /delete
       register: patch_output
       failed_when: patch_output.rc != 0 and
                    "'exit code 3'" not in patch_output.stdout and
                    "'exit code 3010'" not in patch_output.stdout
 
-    - name: Force unmap drive (cleanup)
-      win_shell: cmd.exe /c "net use Z: /delete"
-      ignore_errors: true
+    - name: Ensure Z: drive is unmounted (cleanup)
+      win_shell: net use Z: /delete
+      ignore_errors: yes
