@@ -1,7 +1,7 @@
 ---
 - name: Map drive and install patches
   hosts: windows
-  gather_facts: yes  # Enable fact gathering
+  gather_facts: yes
   tasks:
     - name: Map network drive Z
       win_mapped_drive:
@@ -10,7 +10,7 @@
         state: present
         username: "testdc\\ansible"
         password: "0pT1mus9r1me#"
-    
+
     - name: Check if the network drive Z is mapped
       win_command: "net use Z:"
       register: net_use_status
@@ -21,35 +21,27 @@
         msg: "Network drive Z: could not be mapped. Check the share configuration."
       when: "'Z:' not in net_use_status.stdout"
 
-    - name: Install patch KB5055521
-      win_command: "wusa Z:\\KB5055521.msu /quiet /norestart"
+    - name: Install patch KB5055521 using msiexec
+      win_command: "msiexec /i Z:\\KB5055521.msu /quiet /norestart"
       register: install_kb5055521
       ignore_errors: yes
-      failed_when: false
+      failed_when: install_kb5055521.rc != 0
 
-    - name: Install patch KB5058921
-      win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
+    - name: Install patch KB5058921 using msiexec
+      win_command: "msiexec /i Z:\\KB5058921.msu /quiet /norestart"
       register: install_kb5058921
       ignore_errors: yes
-      failed_when: false
-
-    - name: Debug install results for KB5055521
-      debug:
-        msg: "stdout: {{ install_kb5055521.stdout }}, stderr: {{ install_kb5055521.stderr }}, rc: {{ install_kb5055521.rc }}"
-
-    - name: Debug install results for KB5058921
-      debug:
-        msg: "stdout: {{ install_kb5058921.stdout }}, stderr: {{ install_kb5058921.stderr }}, rc: {{ install_kb5058921.rc }}"
+      failed_when: install_kb5058921.rc != 0
 
     - name: Log installation results for KB5055521
       copy:
-        content: "{{ ansible_date_time.iso8601 }} : KB5055521 : {{ install_kb5055521.stdout }}"
+        content: "{{ ansible_date_time.iso8601 }} : KB5055521 : {{ install_kb5055521.stdout }} - {{ install_kb5055521.stderr }}"
         dest: "C:\\temp\\patch_install_log.txt"
         append: yes
 
     - name: Log installation results for KB5058921
       copy:
-        content: "{{ ansible_date_time.iso8601 }} : KB5058921 : {{ install_kb5058921.stdout }}"
+        content: "{{ ansible_date_time.iso8601 }} : KB5058921 : {{ install_kb5058921.stdout }} - {{ install_kb5058921.stderr }}"
         dest: "C:\\temp\\patch_install_log.txt"
         append: yes
 
