@@ -1,26 +1,30 @@
 ---
-- name: Install patch from Linux SMB share
+- name: Install patches from Samba share on Windows
   hosts: windows
   gather_facts: no
-  vars:
-    smb_user: "testdc\\ansible"
-    smb_password: "0pT1mus9r1me#"
-    patch_path: "Z:\\KB50508921.msu"
-
   tasks:
-    - name: Map network drive Z:
+    - name: Map the Samba share to the Z: drive
       win_mapped_drive:
-        name: "Z:"
-        path: "\\\\192.168.29.78\\winpatches"
+        name: Z:
+        path: \\192.168.29.78\patches  # The Samba share path
+        user: testdc\ansible
+        password: 0pT1mus9r1me#
         state: present
-        user: "{{ smb_user }}"
-        password: "{{ smb_password }}"
-        persistent: no
+        persistent: yes
 
-    - name: Install Windows update patch from Z:
-      win_command: "wusa.exe {{ patch_path }} /quiet /norestart"
+    - name: Install patches from Z: drive
+      win_command: "wusa Z:\\{{ item }} /quiet /norestart"
+      with_items:
+        - KB5058921.msu
+        - KB5055521.msu
+      register: patch_install_results
 
-    - name: Unmap network drive Z:
+    - name: Check patch installation results
+      debug:
+        msg: "Patch {{ item.item }} installed with exit code {{ item.rc }}"
+      with_items: "{{ patch_install_results.results }}"
+      
+    - name: Unmap the Samba share from the Z: drive
       win_mapped_drive:
-        name: "Z:"
+        name: Z:
         state: absent
