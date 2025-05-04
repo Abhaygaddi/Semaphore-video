@@ -15,17 +15,20 @@
       - KB5055521
 
   tasks:
-
     - name: Mount SMB share using net use
-      win_shell: >
+      win_shell: |
         cmd.exe /c "net use Z: {{ smb_share }} /user:{{ smb_user }} {{ smb_pass }} /persistent:no"
       register: mount_result
       failed_when: "'error' in mount_result.stdout.lower() or 'failed' in mount_result.stdout.lower()"
       changed_when: false
 
     - name: Install patches from Z: drive
-      win_shell: >
-        $patches = @({{ patch_list | map('regex_replace', '^(.*)$', '"\1"') | join(', ') }})
+      win_shell: |
+        $patches = @(
+        {% for patch in patch_list %}
+          "{{ patch }}"{% if not loop.last %},{% endif %}
+        {% endfor %}
+        )
         foreach ($patch in $patches) {
           $fullPath = "Z:\\$patch.msu"
           $process = Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -PassThru
