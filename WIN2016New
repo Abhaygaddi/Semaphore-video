@@ -6,7 +6,7 @@
     - name: Map the Samba share to the Z: drive
       win_mapped_drive:
         name: Z:
-        path: \\192.168.29.78\patches  # The Samba share path
+        path: \\192.168.29.78\winpatches  # The Samba share path
         user: testdc\ansible
         password: 0pT1mus9r1me#
         state: present
