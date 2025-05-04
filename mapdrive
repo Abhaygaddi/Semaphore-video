@@ -8,6 +8,5 @@
         letter: Z
         path: "\\\\192.168.29.78\\winpatches"
         state: present
-        user: "testdc\\ansible"
+        username: "testdc\\ansible"
         password: "0pT1mus9r1me#"
-        persistent: no
