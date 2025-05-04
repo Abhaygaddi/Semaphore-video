@@ -1,8 +1,7 @@
 ---
 - name: Map drive and install patches
   hosts: windows
-  gather_facts: yes
-  
+  gather_facts: no
   tasks:
     - name: Map network drive Z
       win_mapped_drive:
@@ -26,11 +25,21 @@
       win_command: "wusa Z:\\KB5055521.msu /quiet /norestart"
       register: install_kb5055521
       ignore_errors: yes
+      failed_when: false
 
     - name: Install patch KB5058921
       win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
       register: install_kb5058921
       ignore_errors: yes
+      failed_when: false
+
+    - name: Debug install results for KB5055521
+      debug:
+        msg: "stdout: {{ install_kb5055521.stdout }}, stderr: {{ install_kb5055521.stderr }}, rc: {{ install_kb5055521.rc }}"
+
+    - name: Debug install results for KB5058921
+      debug:
+        msg: "stdout: {{ install_kb5058921.stdout }}, stderr: {{ install_kb5058921.stderr }}, rc: {{ install_kb5058921.rc }}"
 
     - name: Log installation results for KB5055521
       copy:
