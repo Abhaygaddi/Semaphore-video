@@ -1,6 +1,6 @@
 ---
 - name: Install patches from network share via mapped drive
-  hosts: WIN2016
+  hosts: windows
   gather_facts: no
   tasks:
 
