@@ -15,20 +15,16 @@
       - KB5055521
 
   tasks:
-    - name: Mount SMB share using net use
+    - name: Map SMB share to Z: drive
       win_shell: |
         cmd.exe /c "net use Z: {{ smb_share }} /user:{{ smb_user }} {{ smb_pass }} /persistent:no"
-      register: mount_result
-      failed_when: "'error' in mount_result.stdout.lower() or 'failed' in mount_result.stdout.lower()"
+      register: net_use_result
+      failed_when: "'error' in net_use_result.stdout.lower()"
       changed_when: false
 
     - name: Install patches from Z: drive
       win_shell: |
-        $patches = @(
-        {% for patch in patch_list %}
-          "{{ patch }}"{% if not loop.last %},{% endif %}
-        {% endfor %}
-        )
+        $patches = @("KB5058921", "KB5055521")
         foreach ($patch in $patches) {
           $fullPath = "Z:\\$patch.msu"
           $process = Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -PassThru
@@ -49,6 +45,6 @@
                    "'exit code 3'" not in patch_result.stdout and
                    "'exit code 3010'" not in patch_result.stdout
 
-    - name: Ensure Z: drive is unmounted (cleanup)
+    - name: Ensure Z: drive is unmounted
       win_shell: cmd.exe /c "net use Z: /delete"
       ignore_errors: yes
