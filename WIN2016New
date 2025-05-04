@@ -1,30 +1,37 @@
 ---
-- name: Install updates on Windows 2016
+- name: Install Windows patches from SMB share
   hosts: WIN2016
+  gather_facts: no
+  vars:
+    smb_username: "smbuser"
+    smb_password: "0pT1mus9r1me#"
+    smb_share: "\\\\192.168.29.78\\winpatches"
+    drive_letter: "Z:"
+    patches:
+      - "KB5058921"
+      - "KB5055521"
+
   tasks:
+
     - name: Install patches from SMB share
       win_shell: |
-        $username = "smbuser"
-        $password = "0pT1mus9r1me#"
-        $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
-        $credential = New-Object System.Management.Automation.PSCredential($username, $securePassword)
-
-        New-PSDrive -Name Z -PSProvider FileSystem -Root "\\192.168.29.78\winpatches" -Credential $credential | Out-Null
-        
-        $patches = @("KB5058921", "KB5055521")
+        net use {{ drive_letter }} {{ smb_share }} /user:{{ smb_username }} {{ smb_password }}
+        $patches = @({% for patch in patches %}"{{ patch }}"{% if not loop.last %}, {% endif %}{% endfor %})
         foreach ($patch in $patches) {
-          $fullPath = "Z:\\$patch.msu"
+          $fullPath = "{{ drive_letter }}\\$patch.msu"
           $process = Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -PassThru
           $process.WaitForExit()
-
-          # Check if installation was successful
           if ($process.ExitCode -ne 0) {
             Write-Host "Installation of $patch failed with exit code $($process.ExitCode)"
+            net use {{ drive_letter }} /delete
             exit 1
-          }
-          else {
+          } else {
             Write-Host "Installation of $patch completed successfully"
           }
         }
+        net use {{ drive_letter }} /delete
+      register: patch_installation
 
-        Remove-PSDrive -Name Z
+    - name: Display patch installation output
+      debug:
+        var: patch_installation.stdout_lines
