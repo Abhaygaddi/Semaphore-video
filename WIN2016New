@@ -2,11 +2,11 @@
 - name: Install Windows patches from Linux SMB share
   hosts: windows
   gather_facts: no
-
   vars:
     smb_user: 'testdc\\ansible'
     smb_pass: '0pT1mus9r1me#'
     smb_share: '\\\\192.168.29.78\\winpatches'
+    patch_file: 'KB5058921.msu'
 
   tasks:
 
@@ -16,7 +16,7 @@
 
     - name: Install patch from Z: drive
       win_shell: >
-        wusa.exe Z:\patchfile.msu /quiet /norestart
+        wusa.exe Z:\{{ patch_file }} /quiet /norestart
 
     - name: Unmap Z: drive
       win_shell: net use Z: /delete
