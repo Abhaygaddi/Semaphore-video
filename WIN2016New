@@ -1,5 +1,5 @@
 ---
-- name: Install Windows patches from SMB share
+- name: Install Windows patches from temporary Linux SMB share
   hosts: windows
   gather_facts: no
   become: yes
@@ -9,42 +9,48 @@
   vars:
     smb_user: "testdc\\ansible"
     smb_pass: "0pT1mus9r1me#"
-    smb_share: "\\\\192.168.29.78\\winpatches"
-    patch_list:
+    smb_share: "\\\\192.168.29.78\\winpatches"  # Linux Samba share IP
+    patches:
       - KB5058921
       - KB5055521
 
   tasks:
-    - name: Map SMB share to Z: drive
-      win_shell: |
+    - name: Map Linux SMB share to temporary Z: drive
+      win_shell: >
         cmd.exe /c "net use Z: {{ smb_share }} /user:{{ smb_user }} {{ smb_pass }} /persistent:no"
-      register: net_use_result
-      failed_when: "'error' in net_use_result.stdout.lower()"
+      register: map_output
       changed_when: false
+      failed_when: "'error' in map_output.stdout.lower()"
 
     - name: Install patches from Z: drive
       win_shell: |
-        $patches = @("KB5058921", "KB5055521")
+        $patches = {{ patches | to_json | from_json }}
         foreach ($patch in $patches) {
-          $fullPath = "Z:\\$patch.msu"
-          $process = Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -PassThru
-          $process.WaitForExit()
-          if ($process.ExitCode -eq 3) {
-            Write-Host "Patch $patch is not applicable or already installed"
-          } elseif ($process.ExitCode -ne 0) {
-            Write-Host "Installation of $patch failed with exit code $($process.ExitCode)"
+          $path = "Z:\\$patch.msu"
+          if (Test-Path $path) {
+            $proc = Start-Process -FilePath "wusa.exe" -ArgumentList "$path /quiet /norestart" -PassThru
+            $proc.WaitForExit()
+            if ($proc.ExitCode -eq 3) {
+              Write-Host "Patch $patch is not applicable or already installed"
+            } elseif ($proc.ExitCode -ne 0) {
+              Write-Host "Patch $patch failed with exit code $($proc.ExitCode)"
+              cmd.exe /c "net use Z: /delete"
+              exit 1
+            } else {
+              Write-Host "Patch $patch installed successfully"
+            }
+          } else {
+            Write-Host "Patch file not found: $path"
             cmd.exe /c "net use Z: /delete"
             exit 1
-          } else {
-            Write-Host "Installation of $patch completed successfully"
           }
         }
         cmd.exe /c "net use Z: /delete"
-      register: patch_result
-      failed_when: patch_result.rc != 0 and
-                   "'exit code 3'" not in patch_result.stdout and
-                   "'exit code 3010'" not in patch_result.stdout
+      register: patch_output
+      failed_when: patch_output.rc != 0 and
+                   "'exit code 3'" not in patch_output.stdout and
+                   "'exit code 3010'" not in patch_output.stdout
 
-    - name: Ensure Z: drive is unmounted
+    - name: Force unmap drive (cleanup)
       win_shell: cmd.exe /c "net use Z: /delete"
-      ignore_errors: yes
+      ignore_errors: true
