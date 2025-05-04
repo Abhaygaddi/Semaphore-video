@@ -1,44 +1,41 @@
 ---
-- name: Install Windows patches from Linux SMB share and log result
-  hosts: windows
+- name: Install patches directly from Linux share and log result
+  hosts: WIN2016
   gather_facts: no
-  vars:
-    patch_share: "\\\\192.168.29.78\\winpatches"
-    patches:
-      - KB5055521
-      - KB5058921
-    log_path: "C:\\Temp\\patch_log.txt"
-
   tasks:
 
-    - name: Ensure C:\Temp directory exists
+    - name: Ensure temp directory exists
       win_file:
-        path: "C:\\Temp"
+        path: C:\temp
         state: directory
 
-    - name: Install patches and verify with Get-HotFix
+    - name: Install patches one by one
       win_shell: |
-        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        $kb = "{{ item }}"
-        $patchPath = "{{ patch_share }}\\$kb.msu"
+        $Patch = "{{ item }}"
+        $LogFile = "C:\temp\patch_install_log.txt"
+        $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        $PatchPath = "\\192.168.29.78\winpatches\$Patch.msu"
 
-        try {
-          Start-Process -FilePath "wusa.exe" -ArgumentList "`"$patchPath`" /quiet /norestart" -Wait -ErrorAction Stop
-          Start-Sleep -Seconds 20
-          $installed = Get-HotFix -Id $kb -ErrorAction SilentlyContinue
-          if ($installed) {
-            Add-Content -Path "{{ log_path }}" -Value "$timestamp : $kb : SUCCESS"
-          } else {
-            Add-Content -Path "{{ log_path }}" -Value "$timestamp : $kb : INSTALL ATTEMPTED BUT NOT FOUND IN SYSTEM"
-          }
-        } catch {
-          Add-Content -Path "{{ log_path }}" -Value "$timestamp : $kb : FAILED - $($_.Exception.Message)"
+        # Install the patch silently
+        $InstallResult = Start-Process -FilePath "wusa.exe" -ArgumentList "$PatchPath /quiet /norestart" -Wait -PassThru
+
+        Start-Sleep -Seconds 10
+
+        # Check if patch is installed
+        $HotfixInstalled = (Get-HotFix | Where-Object { $_.HotFixID -eq $Patch }).HotFixID
+
+        if ($HotfixInstalled) {
+            "$Timestamp : $Patch : INSTALLED SUCCESSFULLY" | Out-File -Append -FilePath $LogFile
+        } else {
+            "$Timestamp : $Patch : INSTALL ATTEMPTED BUT NOT FOUND IN SYSTEM. ExitCode: $($InstallResult.ExitCode)" | Out-File -Append -FilePath $LogFile
         }
-      loop: "{{ patches }}"
+      loop:
+        - KB5055521
+        - KB5058921
+      register: patch_results
 
-    - name: Reboot the server after patching
+    - name: Reboot if patch installed successfully
       win_reboot:
-        reboot_timeout: 600
         msg: "Rebooting after patch installation"
-        pre_reboot_delay: 10
-        post_reboot_delay: 30
+        pre_reboot_delay: 30
+      when: "'INSTALLED SUCCESSFULLY' in patch_results.results | map(attribute='stdout') | join('')"
