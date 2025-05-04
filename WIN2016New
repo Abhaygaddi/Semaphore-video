@@ -1,40 +1,51 @@
 ---
-- name: Install patches directly from Linux share and log result
+- name: Install patches from network share via mapped drive
   hosts: WIN2016
   gather_facts: no
   tasks:
 
-    - name: Ensure temp directory exists
+    - name: Ensure C:\temp exists for logging
       win_file:
         path: C:\temp
         state: directory
 
-    - name: Install patches one by one
+    - name: Map network drive Z:
+      win_mapped_drive:
+        letter: Z
+        path: '\\192.168.29.78\winpatches'
+        state: present
+        user: 'testdc\\ansible'
+        password: '0pT1mus9r1me#'
+        persistent: no
+
+    - name: Install patches from Z: and log results
       win_shell: |
         $Patch = "{{ item }}"
+        $PatchPath = "Z:\$Patch.msu"
         $LogFile = "C:\temp\patch_install_log.txt"
         $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        $PatchPath = "\\192.168.29.78\winpatches\$Patch.msu"
 
-        # Install the patch silently
-        $InstallResult = Start-Process -FilePath "wusa.exe" -ArgumentList "$PatchPath /quiet /norestart" -Wait -PassThru
-
+        $Install = Start-Process -FilePath "wusa.exe" -ArgumentList "$PatchPath /quiet /norestart" -Wait -PassThru
         Start-Sleep -Seconds 10
 
-        # Check if patch is installed
-        $HotfixInstalled = (Get-HotFix | Where-Object { $_.HotFixID -eq $Patch }).HotFixID
+        $Hotfix = Get-HotFix | Where-Object { $_.HotFixID -eq $Patch }
 
-        if ($HotfixInstalled) {
-            "$Timestamp : $Patch : INSTALLED SUCCESSFULLY" | Out-File -Append -FilePath $LogFile
+        if ($Hotfix) {
+            "$Timestamp : $Patch : INSTALLED SUCCESSFULLY" | Out-File -FilePath $LogFile -Append
         } else {
-            "$Timestamp : $Patch : INSTALL ATTEMPTED BUT NOT FOUND IN SYSTEM. ExitCode: $($InstallResult.ExitCode)" | Out-File -Append -FilePath $LogFile
+            "$Timestamp : $Patch : INSTALL ATTEMPTED BUT NOT FOUND IN SYSTEM : ExitCode $($Install.ExitCode)" | Out-File -FilePath $LogFile -Append
         }
       loop:
         - KB5055521
         - KB5058921
       register: patch_results
 
-    - name: Reboot if patch installed successfully
+    - name: Unmap network drive Z:
+      win_mapped_drive:
+        letter: Z
+        state: absent
+
+    - name: Reboot if patches were installed
       win_reboot:
         msg: "Rebooting after patch installation"
         pre_reboot_delay: 30
