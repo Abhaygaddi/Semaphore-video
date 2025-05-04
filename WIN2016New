@@ -16,21 +16,8 @@
         path: "C:\\Temp"
         state: directory
 
-    - name: Set timestamp
-      win_shell: powershell -Command "Get-Date -Format 'yyyy-MM-dd HH:mm:ss'"
-      register: timestamp
-
-    - name: Install patches and log results
-      block:
-        - name: Install patch {{ item }}
-          win_command: >
-            wusa.exe "{{ patch_share }}\\{{ item }}" /quiet /norestart
-          register: patch_result
-          ignore_errors: yes
-
-        - name: Log patch result with timestamp and error message
-          win_lineinfile:
-            path: "{{ log_path }}"
-            line: "{{ timestamp.stdout }} : {{ item }} : {{ (patch_result.rc == 0) | ternary('SUCCESS', 'FAILED') }}{{ (patch_result.rc != 0) | ternary(' - ' ~ patch_result.stderr | default(''), '') }}"
-            create: yes
+    - name: Loop through patches
+      include_tasks: install_and_log_patch.yml
       loop: "{{ patches }}"
+      loop_control:
+        loop_var: patch_file
