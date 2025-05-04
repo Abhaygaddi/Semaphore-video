@@ -1,30 +1,36 @@
 ---
-- name: Install patches from Samba share on Windows
+- name: Install Windows patches from Linux SMB share and log result
   hosts: windows
   gather_facts: no
+  vars:
+    patch_share: "\\\\192.168.29.78\\winpatches"
+    patches:
+      - KB5055521.msu
+      - KB5058921.msu
+    log_path: "C:\\Temp\\patch_log.txt"
+
   tasks:
-    - name: Map the Samba share to the Z: drive
-      win_mapped_drive:
-        name: Z:
-        path: \\192.168.29.78\winpatches  # The Samba share path
-        user: testdc\ansible
-        password: 0pT1mus9r1me#
-        state: present
-        persistent: yes
 
-    - name: Install patches from Z: drive
-      win_command: "wusa Z:\\{{ item }} /quiet /norestart"
-      with_items:
-        - KB5058921.msu
-        - KB5055521.msu
-      register: patch_install_results
+    - name: Ensure C:\Temp directory exists
+      win_file:
+        path: "C:\\Temp"
+        state: directory
 
-    - name: Check patch installation results
-      debug:
-        msg: "Patch {{ item.item }} installed with exit code {{ item.rc }}"
-      with_items: "{{ patch_install_results.results }}"
-      
-    - name: Unmap the Samba share from the Z: drive
-      win_mapped_drive:
-        name: Z:
-        state: absent
+    - name: Set timestamp
+      win_shell: powershell -Command "Get-Date -Format 'yyyy-MM-dd HH:mm:ss'"
+      register: timestamp
+
+    - name: Install patches and log results
+      block:
+        - name: Install patch {{ item }}
+          win_command: >
+            wusa.exe "{{ patch_share }}\\{{ item }}" /quiet /norestart
+          register: patch_result
+          ignore_errors: yes
+
+        - name: Log patch result with timestamp and error message
+          win_lineinfile:
+            path: "{{ log_path }}"
+            line: "{{ timestamp.stdout }} : {{ item }} : {{ (patch_result.rc == 0) | ternary('SUCCESS', 'FAILED') }}{{ (patch_result.rc != 0) | ternary(' - ' ~ patch_result.stderr | default(''), '') }}"
+            create: yes
+      loop: "{{ patches }}"
