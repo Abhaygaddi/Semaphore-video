@@ -16,7 +16,7 @@
         state: present
         user: "testdc\\ansible"
         password: "0pT1mus9r1me#"
-        persistent: no
+        persistent: yes
 
     - name: Verify if drive Z: is mapped
       win_shell: |
