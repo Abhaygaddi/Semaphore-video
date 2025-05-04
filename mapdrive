@@ -10,12 +10,6 @@
         state: present
         username: "testdc\\ansible"
         password: "0pT1mus9r1me#"
-      register: map_drive_result
-      failed_when: map_drive_result.failed
-
-    - name: Debug: Show result of drive mapping attempt
-      debug:
-        var: map_drive_result
 
     - name: Check if the network drive Z is mapped
       win_command: "net use Z:"
