@@ -12,7 +12,7 @@
         password: "0pT1mus9r1me#"
     
     - name: Check if the network drive Z is mapped
-      win_command: net use Z:
+      win_command: "net use Z:"
       register: net_use_status
       failed_when: false
 
