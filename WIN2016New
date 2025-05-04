@@ -1,37 +1,47 @@
 ---
-- name: Install Windows patches from SMB share
+- name: Install Windows patches from SMB share using New-PSDrive
   hosts: WIN2016
   gather_facts: no
   vars:
     smb_username: "smbuser"
     smb_password: "0pT1mus9r1me#"
     smb_share: "\\\\192.168.29.78\\winpatches"
-    drive_letter: "Z:"
+    drive_letter: "Z"
     patches:
       - "KB5058921"
       - "KB5055521"
 
   tasks:
-
-    - name: Install patches from SMB share
+    - name: Install patches from network share
       win_shell: |
-        net use {{ drive_letter }} {{ smb_share }} /user:{{ smb_username }} {{ smb_password }}
+        $username = "{{ smb_username }}"
+        $password = "{{ smb_password }}"
+        $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
+        $credential = New-Object System.Management.Automation.PSCredential($username, $securePassword)
+
+        # Mount the SMB share
+        New-PSDrive -Name {{ drive_letter }} -PSProvider FileSystem -Root "{{ smb_share }}" -Credential $credential -Persist
+
+        # Patch installation
         $patches = @({% for patch in patches %}"{{ patch }}"{% if not loop.last %}, {% endif %}{% endfor %})
         foreach ($patch in $patches) {
-          $fullPath = "{{ drive_letter }}\\$patch.msu"
+          $fullPath = "{{ drive_letter }}:\\$patch.msu"
           $process = Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -PassThru
           $process.WaitForExit()
           if ($process.ExitCode -ne 0) {
             Write-Host "Installation of $patch failed with exit code $($process.ExitCode)"
-            net use {{ drive_letter }} /delete
+            Remove-PSDrive -Name {{ drive_letter }}
             exit 1
           } else {
             Write-Host "Installation of $patch completed successfully"
           }
         }
-        net use {{ drive_letter }} /delete
-      register: patch_installation
 
-    - name: Display patch installation output
+        # Unmount the SMB share
+        Remove-PSDrive -Name {{ drive_letter }}
+      register: patch_output
+      failed_when: patch_output.rc != 0
+
+    - name: Show patch output
       debug:
-        var: patch_installation.stdout_lines
+        var: patch_output.stdout_lines
