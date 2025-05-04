@@ -12,10 +12,10 @@
     - name: Map network drive Z:
       win_mapped_drive:
         letter: Z
-        path: '\\192.168.29.78\winpatches'
+        path: "\\192.168.29.78\\winpatches"
         state: present
-        user: 'TESTDC\\ansible'
-        password: '0pT1mus9r1me#'
+        user: "testdc\\ansible"
+        password: "0pT1mus9r1me#"
         persistent: no
 
     - name: Verify if drive Z: is mapped
@@ -56,7 +56,7 @@
         letter: Z
         state: absent
 
-    - name: Reboot if patches were installed
+    - name: Reboot if any patch was installed
       win_reboot:
         msg: "Rebooting after patch installation"
         pre_reboot_delay: 30
