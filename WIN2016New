@@ -1,47 +1,38 @@
 ---
-- name: Install Windows patches from SMB share using New-PSDrive
+- name: Install Windows patches from SMB share
   hosts: WIN2016
   gather_facts: no
   vars:
-    smb_username: "smbuser"
-    smb_password: "0pT1mus9r1me#"
     smb_share: "\\\\192.168.29.78\\winpatches"
-    drive_letter: "Z"
+    smb_user: "smbuser"
+    smb_pass: "0pT1mus9r1me#"
     patches:
       - "KB5058921"
       - "KB5055521"
 
   tasks:
-    - name: Install patches from network share
+    - name: Map network drive and install patches
       win_shell: |
-        $username = "{{ smb_username }}"
-        $password = "{{ smb_password }}"
-        $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
-        $credential = New-Object System.Management.Automation.PSCredential($username, $securePassword)
-
-        # Mount the SMB share
-        New-PSDrive -Name {{ drive_letter }} -PSProvider FileSystem -Root "{{ smb_share }}" -Credential $credential -Persist
-
-        # Patch installation
+        cmd.exe /c "net use Z: {{ smb_share }} /user:{{ smb_user }} {{ smb_pass }} /persistent:no"
         $patches = @({% for patch in patches %}"{{ patch }}"{% if not loop.last %}, {% endif %}{% endfor %})
         foreach ($patch in $patches) {
-          $fullPath = "{{ drive_letter }}:\\$patch.msu"
+          $fullPath = "Z:\\$patch.msu"
           $process = Start-Process -FilePath "wusa.exe" -ArgumentList "$fullPath /quiet /norestart" -PassThru
           $process.WaitForExit()
-          if ($process.ExitCode -ne 0) {
+          if ($process.ExitCode -eq 3) {
+            Write-Host "Patch $patch is not applicable or already installed"
+          } elseif ($process.ExitCode -ne 0) {
             Write-Host "Installation of $patch failed with exit code $($process.ExitCode)"
-            Remove-PSDrive -Name {{ drive_letter }}
+            cmd.exe /c "net use Z: /delete"
             exit 1
           } else {
             Write-Host "Installation of $patch completed successfully"
           }
         }
+        cmd.exe /c "net use Z: /delete"
+      register: patch_result
+      failed_when: patch_result.rc != 0 and "'exit code 3'" not in patch_result.stdout
 
-        # Unmount the SMB share
-        Remove-PSDrive -Name {{ drive_letter }}
-      register: patch_output
-      failed_when: patch_output.rc != 0
-
-    - name: Show patch output
+    - name: Show output
       debug:
-        var: patch_output.stdout_lines
+        var: patch_result.stdout_lines
