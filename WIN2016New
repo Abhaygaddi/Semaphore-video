@@ -1,63 +1,65 @@
 ---
-- name: Install patches from network share via mapped drive
+- name: Install Windows patches from shared drive
   hosts: windows
-  gather_facts: no
+  gather_facts: yes
   tasks:
 
-    - name: Ensure C:\temp exists for logging
+    - name: Ensure C:\Temp directory exists for logs
       win_file:
-        path: C:\temp
+        path: C:\Temp
         state: directory
 
-    - name: Map network drive Z:
+    - name: Map network drive Z
       win_mapped_drive:
         letter: Z
-        path: "\\192.168.29.78\\winpatches"
+        path: "\\192.168.29.132\Patches"
         state: present
-        user: "testdc\\ansible"
+        username: "testdc\\ansible"
         password: "0pT1mus9r1me#"
-        persistent: yes
+      register: map_drive_result
 
-    - name: Verify if drive Z: is mapped
-      win_shell: |
-        if (!(Test-Path Z:\)) {
-          Write-Host "Drive Z: not mapped"
-          exit 1
-        } else {
-          Write-Host "Drive Z: mapped successfully"
-        }
-      register: drive_check
-      failed_when: drive_check.rc != 0
+    - name: Debug drive mapping
+      debug:
+        var: map_drive_result
 
-    - name: Install patches from Z: and log results
-      win_shell: |
-        $Patch = "{{ item }}"
-        $PatchPath = "Z:\$Patch.msu"
-        $LogFile = "C:\temp\patch_install_log.txt"
-        $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    - name: Verify drive Z mapping
+      win_command: "net use Z:"
+      register: net_use_check
+      failed_when: "'Z:' not in net_use_check.stdout"
 
-        $Install = Start-Process -FilePath "wusa.exe" -ArgumentList "$PatchPath /quiet /norestart" -Wait -PassThru
-        Start-Sleep -Seconds 10
+    - name: Install KB5058921 using wusa
+      win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
+      register: install_kb5058921
+      ignore_errors: yes
+      failed_when: install_kb5058921.rc not in [0, 3010]  # 3010 = Reboot required
 
-        $Hotfix = Get-HotFix | Where-Object { $_.HotFixID -eq $Patch }
+    - name: Install KB5055521 using wusa
+      win_command: "wusa Z:\\KB5055521.msu /quiet /norestart"
+      register: install_kb5055521
+      ignore_errors: yes
+      failed_when: install_kb5055521.rc not in [0, 3010]
 
-        if ($Hotfix) {
-            "$Timestamp : $Patch : INSTALLED SUCCESSFULLY" | Out-File -FilePath $LogFile -Append
-        } else {
-            "$Timestamp : $Patch : INSTALL ATTEMPTED BUT NOT FOUND IN SYSTEM : ExitCode $($Install.ExitCode)" | Out-File -FilePath $LogFile -Append
-        }
-      loop:
-        - KB5055521
-        - KB5058921
-      register: patch_results
+    - name: Log KB5058921 installation result
+      win_lineinfile:
+        path: C:\Temp\patch_install_log.txt
+        create: yes
+        line: "{{ ansible_date_time.iso8601 }} - KB5058921 - RC={{ install_kb5058921.rc }}"
 
-    - name: Unmap network drive Z:
+    - name: Log KB5055521 installation result
+      win_lineinfile:
+        path: C:\Temp\patch_install_log.txt
+        create: yes
+        line: "{{ ansible_date_time.iso8601 }} - KB5055521 - RC={{ install_kb5055521.rc }}"
+
+    - name: Reboot if patches require it
+      win_reboot:
+        reboot_timeout: 600
+        test_command: 'echo "Reboot complete"'
+        pre_reboot_delay: 10
+        post_reboot_delay: 15
+      when: install_kb5058921.rc == 3010 or install_kb5055521.rc == 3010
+
+    - name: Unmap network drive Z
       win_mapped_drive:
         letter: Z
         state: absent
-
-    - name: Reboot if any patch was installed
-      win_reboot:
-        msg: "Rebooting after patch installation"
-        pre_reboot_delay: 30
-      when: "'INSTALLED SUCCESSFULLY' in patch_results.results | map(attribute='stdout') | join('')"
