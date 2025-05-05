@@ -1,63 +1,59 @@
 ---
-- name: Install Windows patches from shared drive
+- name: Map drive and install Windows patches from share
   hosts: windows
   gather_facts: yes
+
   tasks:
-
-    - name: Ensure C:\Temp directory exists for logs
-      win_file:
-        path: C:\Temp
-        state: directory
-
     - name: Map network drive Z
       win_mapped_drive:
         letter: Z
-        path: "\\192.168.29.132\Patches"
+        path: "\\\\192.168.29.132\\Patches"
         state: present
         username: "testdc\\ansible"
         password: "0pT1mus9r1me#"
-      register: map_drive_result
 
-    - name: Debug drive mapping
-      debug:
-        var: map_drive_result
-
-    - name: Verify drive Z mapping
+    - name: Check if the network drive Z is mapped
       win_command: "net use Z:"
-      register: net_use_check
-      failed_when: "'Z:' not in net_use_check.stdout"
+      register: net_use_status
+      failed_when: false
 
-    - name: Install KB5058921 using wusa
-      win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
-      register: install_kb5058921
-      ignore_errors: yes
-      failed_when: install_kb5058921.rc not in [0, 3010]  # 3010 = Reboot required
+    - name: Fail if network drive Z is not mapped
+      fail:
+        msg: "Drive Z: not mapped. Check path or credentials."
+      when: "'Z:' not in net_use_status.stdout"
 
-    - name: Install KB5055521 using wusa
+    - name: Install patch KB5055521
       win_command: "wusa Z:\\KB5055521.msu /quiet /norestart"
-      register: install_kb5055521
-      ignore_errors: yes
-      failed_when: install_kb5055521.rc not in [0, 3010]
+      register: kb5055521_result
+      ignore_errors: true
 
-    - name: Log KB5058921 installation result
+    - name: Install patch KB5058921
+      win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
+      register: kb5058921_result
+      ignore_errors: true
+
+    - name: Create log folder if not exists
+      win_file:
+        path: C:\temp
+        state: directory
+
+    - name: Log result for KB5055521
       win_lineinfile:
-        path: C:\Temp\patch_install_log.txt
-        create: yes
-        line: "{{ ansible_date_time.iso8601 }} - KB5058921 - RC={{ install_kb5058921.rc }}"
+        path: C:\temp\patch_install_log.txt
+        line: "{{ ansible_date_time.iso8601 }} - KB5055521 - rc: {{ kb5055521_result.rc }}"
 
-    - name: Log KB5055521 installation result
+    - name: Log result for KB5058921
       win_lineinfile:
-        path: C:\Temp\patch_install_log.txt
-        create: yes
-        line: "{{ ansible_date_time.iso8601 }} - KB5055521 - RC={{ install_kb5055521.rc }}"
+        path: C:\temp\patch_install_log.txt
+        line: "{{ ansible_date_time.iso8601 }} - KB5058921 - rc: {{ kb5058921_result.rc }}"
 
-    - name: Reboot if patches require it
+    - name: Reboot if any patch installed successfully
       win_reboot:
         reboot_timeout: 600
-        test_command: 'echo "Reboot complete"'
+        test_command: "echo Reboot complete"
         pre_reboot_delay: 10
-        post_reboot_delay: 15
-      when: install_kb5058921.rc == 3010 or install_kb5055521.rc == 3010
+        post_reboot_delay: 10
+      when: kb5055521_result.rc == 0 or kb5058921_result.rc == 0
 
     - name: Unmap network drive Z
       win_mapped_drive:
