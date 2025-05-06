@@ -1,20 +1,21 @@
 ---
 - name: Copy Map.exe to remote hosts
   hosts: all  # Specify the target hosts or group
-  gather_facts: no # set to no to improve speed
+  gather_facts: no
 
   tasks:
-    - name: Copy Map.exe
+    - name: Copy Map.exe from network share
       win_copy:
-        src: '\\192.168.29.132\Patches\Map.exe'  # Use double quotes and escape backslashes
+        src: '\\192.168.29.132\Patches\Map.exe'
         dest: 'C:\temp\Map.exe'
+        remote_src: yes  # Add this line to indicate the source is on the remote host
         # optional:
         #  remote_user:  # Specify a different user if needed
-        #  remote_pass:  # Specify password.  Use a secure method instead.
-        #  become: yes       #  If you need to run with elevated privileges
-        #  become_method: runas #  If you need to use runas
-      #  register: copy_result #register the output
+        #  remote_password:  # Specify password.  Use a secure method instead.
+        #  become: yes
+        #  become_method: runas
+      #  register: copy_result
 
-    # - name: Print the result (optional, for debugging)
+    # - name: Print the result
     #   debug:
     #     var: copy_result
