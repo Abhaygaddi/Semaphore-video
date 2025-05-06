@@ -1,7 +1,7 @@
+---
 - name: Map drive and run Map.exe
-  hosts: windows
+  hosts: WIN2016
   gather_facts: no
-
   tasks:
     - name: Map Z: drive to UNC path
       win_command: >
