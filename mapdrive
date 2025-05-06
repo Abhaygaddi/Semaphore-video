@@ -1,4 +1,4 @@
-- name: Map drive Z:
+- name: Map drive Z
   win_mapped_drive:
     letter: Z
     path: "\\\\192.168.29.132\\Patches"
