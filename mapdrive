@@ -23,7 +23,7 @@
     - name: Copy patch from Ansible host to Windows server
       ansible.windows.win_copy:
         src: "{{ local_patch_path }}"
-        dest: "{{ remote_patch_dir }}\KB5055521.msu"
+        dest: "{{ remote_patch_dir }}\\KB5055521.msu"
       when: ansible_facts.os_name == "Microsoft Windows Server 2016 Standard"
       become: yes
       become_method: runas
@@ -31,7 +31,7 @@
 
     - name: Install hotfix without validating KB and Identifier
       community.windows.win_hotfix:
-        source: "{{ remote_patch_dir }}\KB5055521.msu"
+        source: "{{ remote_patch_dir }}\\KB5055521.msu"
         state: present
       when: ansible_facts.os_name == "Microsoft Windows Server 2016 Standard"
       register: hotfix_install_2016
