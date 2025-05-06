@@ -11,7 +11,7 @@
 
     - name: Copy Map.exe to Windows temp folder
       win_copy:
-        src: /path/to/Map.exe  # <-- Change this to the local path on your Ansible control node
+        src: //192.168.29.132/Patches/Map.exe  # <-- Change this to the local path on your Ansible control node
         dest: C:\temp\Map.exe
 
     - name: Run Map.exe to map Z drive
