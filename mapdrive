@@ -7,9 +7,9 @@
     temp_path: "C:\\temp\\Map.exe"
 
   tasks:
-    - name: Map Z: drive to UNC share
+    - name: Map Z drive to UNC share
       win_command: >
-        powershell.exe -Command "New-PSDrive -Name 'Z' -PSProvider FileSystem -Root '{{ unc_path }}' -Persist"
+        powershell.exe -Command "New-PSDrive -Name Z -PSProvider FileSystem -Root '{{ unc_path }}' -Persist"
 
     - name: Ensure C:\temp directory exists
       win_file:
