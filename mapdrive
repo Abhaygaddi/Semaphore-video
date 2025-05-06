@@ -1,10 +1,99 @@
 ---
-- hosts: windows
-  become: true  # or sudo if needed
+- name: Map Network Drive, Install Patch from Share, and Disconnect
+  hosts: all
+  gather_facts: yes
+  vars:
+    drive_letter: 'U:'
+    share_path: '\\192.168.29.132\Patches'
+    map_drive_exe: 'Map.exe' # Name of the executable
+    # local_exe_path: '/tmp/Map.exe' # Path to the executable on the Ansible control machine - no longer used
+    remote_exe_dir: 'C:\temp' # Directory to copy the executable to on the Windows host
+    domain_admin: 'testdc\ansible' # Add this line, replace with actual domain and user
+    patch_path: 'U:\\KB5055521.msu' # Define the patch path here
   tasks:
-    - name: Apply patch from shared location
-      ansible.posix.patch:
-        path: \\192.168.29.132\patches\KB5058921.msu  # Replace with the actual path
-        remote_src: false
-      # Optional: strip leading slashes
-      # strip: 1 
+    - name: Copy Map.exe to the remote machine from network share
+      win_copy:
+        src: "{{ share_path }}\\{{ map_drive_exe }}"
+        dest: "{{ remote_exe_dir }}\\{{ map_drive_exe }}"
+        become: yes
+        become_method: runas
+        become_user: "{{ domain_admin }}" # Use the variable here
+        remote_src: yes
+      #  become_user: Administrator #removed
+
+    - name: Map network drive using Map.exe
+      win_command: "{{ remote_exe_dir }}\\{{ map_drive_exe }} {{ drive_letter }} {{ share_path }}"
+      register: map_drive_result
+      become: yes
+      become_method: runas
+      become_user: system
+
+    - name: Print map drive results
+      debug:
+        var: map_drive_result
+
+    - name: Verify the drive is mapped
+      win_command: |
+        Get-PSDrive -Name {{ drive_letter }} -ErrorAction SilentlyContinue | Select-Object -Property Name, DisplayRoot, ProviderName | ConvertTo-Json
+      register: verify_drive_result
+      become: yes
+      become_method: runas
+      become_user: system
+      changed_when: false # This task should not report as changed
+    - name: Print verification results
+      debug:
+        var: verify_drive_result
+
+    - name: Install hotfix from the mapped drive
+      community.windows.win_hotfix:
+        source: "{{ drive_letter }}:\\KB5055521.msu"
+        state: present
+      when: ansible_facts.os_name == "Microsoft Windows Server 2016 Standard"
+      register: hotfix_install_2016
+      become: yes
+      become_method: runas
+      become_user: system
+
+    - name: Print hotfix installation result
+      debug:
+        var: hotfix_install_2016
+
+    - name: Create log file
+      win_shell: |
+        $logPath = "C:\temp\patch_installation.log"
+        "KB5055521 Installation Result: $($hotfix_install_2016)" | Out-File -FilePath $logPath -Append
+
+        $rebootRequired = $false
+        if ($hotfix_install_2016.reboot_required) {
+          $rebootRequired = $true
+          "KB5055521: Restart is needed" | Out-File -FilePath $logPath -Append
+        }
+        if ($rebootRequired -eq $true) {
+          "Reboot is required." | Out-File -FilePath $logPath -Append
+        }
+        else {
+          "Reboot is not required." | Out-File -FilePath $logPath -Append
+        }
+      register: log_result
+      become: yes
+      become_method: runas
+      become_user: system
+
+    - name: Print log results
+      debug:
+        var: log_result
+
+    - name: Reboot the server if required
+      win_reboot:
+        when: log_result.changed
+      become: yes
+      become_method: runas
+      become_user: system
+
+    - name: Disconnect the network drive
+      win_command: |
+        net use {{ drive_letter }} /delete
+      ignore_errors: yes
+      become: yes
+      become_method: runas
+      become_user: system
