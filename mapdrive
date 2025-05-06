@@ -1,18 +1,30 @@
 ---
-- name: Copy Map.exe to another Windows server using Kerberos
+- name: Install Windows Patches from Network Share with Logging
   hosts: all
   gather_facts: no
   tasks:
-    - name: Copy Map.exe from one Windows server to another (Kerberos)
-      win_copy:
-        src: '\\192.168.29.132\Patches\Map.exe'
-        dest: 'C:\temp\Map.exe'
+    - name: Install patch KB5055521.msu from network share
+      win_updates:
+        state: present
+        update_file: '\\192.168.29.132\Patches\KB5055521.msu'
         remote_src: yes
-        become: yes
-        become_method: runas
-        kerberos_auth: yes  # Enable Kerberos authentication
-    - name: Run Map.exe as administrator
+      register: install_result_1
+    - name: Install patch KB5058921.msu from network share
+      win_updates:
+        state: present
+        update_file: '\\192.168.29.132\Patches\KB5058921.msu'
+        remote_src: yes
+      register: install_result_2
+    - name: Create log file
       win_shell: |
-        Start-Process -FilePath "C:\temp\Map.exe" -Verb runas
-      become: yes
-      become_method: runas
+        $logPath = "C:\temp\patch_installation.log"
+        "KB5055521 Installation Result: $($install_result_1.msg)" | Out-File -FilePath $logPath -Append
+        "KB5058921 Installation Result: $($install_result_2.msg)" | Out-File -FilePath $logPath -Append
+        if ($install_result_1.reboot_required -eq $true -or $install_result_2.reboot_required -eq $true) {
+          "Reboot is required." | Out-File -FilePath $logPath -Append
+        } else {
+          "Reboot is not required." | Out-File -FilePath $logPath -Append
+        }
+    - name: Reboot the server if required
+      win_reboot:
+      when: install_result_1.reboot_required or install_result_2.reboot_required
