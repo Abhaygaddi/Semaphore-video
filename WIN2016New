@@ -1,56 +1,43 @@
 ---
-- name: Map drive and install Windows patches from network share
+- name: Map drive via EXE and install patches
   hosts: windows
   gather_facts: yes
-  vars:
-    share_path: "\\\\192.168.29.98\\Patches"
-    drive_letter: Z
-    username: "testdc\\ansible"
-    password: "0pT1mus9r1me#"
-    patch_files:
-      - KB5055521.msu
-      - KB5058921.msu
-
   tasks:
-    - name: Map network drive
-      win_mapped_drive:
-        letter: "{{ drive_letter }}"
-        path: "{{ share_path }}"
-        username: "{{ username }}"
-        password: "{{ password }}"
-        state: present
 
-    - name: Verify network drive mapping
-      win_command: "net use {{ drive_letter }}:"
-      register: mapped_drive_status
-      failed_when: "'OK' not in mapped_drive_status.stdout"
+    - name: Ensure temp directory exists
+      win_file:
+        path: C:\temp
+        state: directory
 
-    - name: Install patch KB5055521
-      win_command: "wusa {{ drive_letter }}:\\KB5055521.msu /quiet /norestart"
-      register: kb5055521_result
-      failed_when: kb5055521_result.rc not in [0, 3]
+    - name: Copy Map.exe to Windows temp folder
+      win_copy:
+        src: /path/to/Map.exe  # Change this to your local Ansible control path
+        dest: C:\temp\Map.exe
 
-    - name: Install patch KB5058921
-      win_command: "wusa {{ drive_letter }}:\\KB5058921.msu /quiet /norestart"
-      register: kb5058921_result
-      failed_when: kb5058921_result.rc not in [0, 3]
+    - name: Run Map.exe to map Z: to \\192.168.29.132\Patches
+      win_command: C:\temp\Map.exe
+      register: map_drive
+      failed_when: map_drive.rc != 0
 
-    - name: Log result of KB5055521 installation
-      copy:
-        content: "{{ ansible_date_time.iso8601 }} - KB5055521 install RC: {{ kb5055521_result.rc }}"
-        dest: "C:\\Temp\\KB5055521_log.txt"
+    - name: Wait for drive Z: to be available
+      win_command: "dir Z:\\"
+      register: drive_check
+      retries: 5
+      delay: 3
+      until: drive_check.rc == 0
 
-    - name: Log result of KB5058921 installation
-      copy:
-        content: "{{ ansible_date_time.iso8601 }} - KB5058921 install RC: {{ kb5058921_result.rc }}"
-        dest: "C:\\Temp\\KB5058921_log.txt"
+    - name: Install patch KB5055521 using wusa
+      win_command: "wusa Z:\\KB5055521.msu /quiet /norestart"
+      register: patch1
+      ignore_errors: true
 
-    - name: Reboot if any patch was installed
+    - name: Install patch KB5058921 using wusa
+      win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
+      register: patch2
+      ignore_errors: true
+
+    - name: Reboot the server if any patch was installed
       win_reboot:
         reboot_timeout: 600
-      when: kb5055521_result.rc == 0 or kb5058921_result.rc == 0
-
-    - name: Unmap network drive
-      win_mapped_drive:
-        letter: "{{ drive_letter }}"
-        state: absent
+        test_command: 'echo Reboot completed'
+      when: patch1.rc == 0 or patch2.rc == 0
