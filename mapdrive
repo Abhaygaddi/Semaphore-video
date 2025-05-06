@@ -4,7 +4,7 @@
   gather_facts: no
   tasks:
 
-    - name: Map network drive Z:
+    - name: Map network drive Z
       win_mapped_drive:
         letter: Z
         path: "\\\\192.168.29.132\\Patches"
@@ -20,18 +20,18 @@
     - name: Copy Map.exe from mapped drive to C:\temp
       win_command: powershell.exe -Command "Copy-Item 'Z:\\Map.exe' -Destination 'C:\\temp\\Map.exe' -Force"
 
-    - name: Run Map.exe to map Z: drive persistently
+    - name: Run Map.exe to map Z drive persistently
       win_command: "C:\\temp\\Map.exe"
 
     - name: Install patch KB5055521
       win_command: "wusa Z:\\KB5055521.msu /quiet /norestart"
       register: install_kb1
-      ignore_errors: yes
+      ignore_errors: true
 
     - name: Install patch KB5058921
       win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
       register: install_kb2
-      ignore_errors: yes
+      ignore_errors: true
 
     - name: Reboot if any patch was installed
       win_reboot:
