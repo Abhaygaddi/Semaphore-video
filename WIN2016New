@@ -11,18 +11,18 @@
         state: directory
 
     - name: Copy Map.exe from share to C:\temp
-      win_command: powershell.exe -Command "Copy-Item '\\192.168.29.132\Patches\Map.exe' -Destination 'C:\temp\Map.exe' -Force"
+      win_command: powershell.exe -Command "Copy-Item '\\\\192.168.29.132\\Patches\\Map.exe' -Destination 'C:\\temp\\Map.exe' -Force"
 
     - name: Run Map.exe to map Z: drive
-      win_command: C:\temp\Map.exe
+      win_command: "C:\\temp\\Map.exe"
 
     - name: Install patch KB5055521
-      win_command: wusa Z:\KB5055521.msu /quiet /norestart
+      win_command: "wusa Z:\\KB5055521.msu /quiet /norestart"
       register: patch_1
       ignore_errors: yes
 
     - name: Install patch KB5058921
-      win_command: wusa Z:\KB5058921.msu /quiet /norestart
+      win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
       register: patch_2
       ignore_errors: yes
 
