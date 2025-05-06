@@ -17,7 +17,7 @@
         }
       register: drive_check_result
       changed_when: false
-      failed_when: drive_check_result.rc > 1
+      failed_when: drive_check_result.rc != 0 # Changed this line
 
     - name: Map network drive
       win_command: |
