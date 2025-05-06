@@ -1,16 +1,29 @@
-- name: Copy and run Map.exe on Windows Server
+- name: Copy and run Map.exe with credentials
   hosts: WIN2016
   gather_facts: no
-  tasks:
+  vars:
+    share_path: "\\192.168.29.132\Patches"
+    username: "TESTDC\\ansible"          # Or just 'ansible' if local user
+    password: "0pT1mus9r1me#"            # Escaped properly if needed
 
-    - name: Ensure C:\temp directory exists
+  tasks:
+    - name: Ensure C:\temp exists
       win_file:
         path: C:\temp
         state: directory
 
-    - name: Copy Map.exe from UNC path to C:\temp
-      win_command: >
-        powershell.exe -Command "Copy-Item '\\192.168.29.132\Patches\Map.exe' -Destination 'C:\temp\Map.exe' -Force"
+    - name: Map network drive using New-PSDrive
+      win_shell: |
+        $secpasswd = ConvertTo-SecureString '{{ password }}' -AsPlainText -Force
+        $creds = New-Object System.Management.Automation.PSCredential ("{{ username }}", $secpasswd)
+        New-PSDrive -Name "Z" -PSProvider FileSystem -Root "{{ share_path }}" -Credential $creds -Persist
+
+    - name: Copy Map.exe from Z: to C:\temp
+      win_command: powershell.exe -Command "Copy-Item 'Z:\\Map.exe' -Destination 'C:\\temp\\Map.exe' -Force"
 
     - name: Run Map.exe from C:\temp
       win_command: C:\temp\Map.exe
+
+    - name: Remove mapped drive Z:
+      win_shell: Remove-PSDrive -Name "Z"
+      ignore_errors: yes
