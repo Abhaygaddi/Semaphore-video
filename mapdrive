@@ -1,5 +1,5 @@
 ---
-- name: Install Windows Patches from Network Share with Logging
+- name: Install Windows Patches from Network Share with Logging and Reboot
   hosts: all
   gather_facts: no
   tasks:
@@ -14,16 +14,31 @@
     - name: Create log file
       win_shell: |
         $logPath = "C:\temp\patch_installation.log"
-        "KB5055521 Installation Result: $($install_result_1.stdout) $($install_result_1.stderr)" | Out-File -FilePath $logPath -Append
-        "KB5058921 Installation Result: $($install_result_2.stdout) $($install_result_2.stderr)" | Out-File -FilePath $logPath -Append
-        if ($install_result_1.rc -eq 0 -or $install_result_2.rc -eq 0) {
-          "Patches Installed Successfully" | Out-File -FilePath $logPath -Append
+        "KB5055521 Installation Result: $($install_result_1.stdout) $($install_result_1.stderr) Return Code: $($install_result_1.rc)" | Out-File -FilePath $logPath -Append
+        "KB5058921 Installation Result: $($install_result_2.stdout) $($install_result_2.stderr) Return Code: $($install_result_2.rc)" | Out-File -FilePath $logPath -Append
+
+        $rebootRequired1 = $false
+        $rebootRequired2 = $false
+
+        if ($install_result_1.stdout -like "*Restart needed*") {
+            $rebootRequired1 = $true
+            "KB5055521: Restart is needed" | Out-File -FilePath $logPath -Append
         }
-        if ($install_result_1.reboot_required -eq $true -or $install_result_2.reboot_required -eq $true) {
+        if ($install_result_2.stdout -like "*Restart needed*") {
+            $rebootRequired2 = $true
+            "KB5058921: Restart is needed" | Out-File -FilePath $logPath -Append
+        }
+
+        if ($rebootRequired1 -eq $true -or $rebootRequired2 -eq $true) {
           "Reboot is required." | Out-File -FilePath $logPath -Append
-        } else {
+        }
+        else {
           "Reboot is not required." | Out-File -FilePath $logPath -Append
         }
+      register: log_result #register the output
+    - name: Print log results
+      debug:
+        var: log_result
     - name: Reboot the server if required
       win_reboot:
-      when: install_result_1.reboot_required or install_result_2.reboot_required
+      when: log_result.changed
