@@ -8,9 +8,7 @@
         src: '\\192.168.29.132\Patches\Map.exe'
         dest: 'C:\temp\Map.exe'
         remote_src: yes
-        remote_user: 'testdc\ansible'  # Use domain\username
-        remote_password: '0pT1mus9r1me#'
-        become: yes
+       become: yes
         become_method: runas
     - name: Run Map.exe as administrator
       win_shell: |
