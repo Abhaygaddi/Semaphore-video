@@ -1,20 +1,18 @@
 ---
-- name: Map drive and run Map.exe
+- name: Map network drive and execute Map.exe
   hosts: WIN2016
   gather_facts: no
   tasks:
     - name: Map Z: drive to UNC path
-      win_command: >
-        powershell.exe -Command "New-PSDrive -Name Z -PSProvider FileSystem -Root '\\\\192.168.29.132\\Patches' -Persist"
+      win_command: powershell.exe -Command "New-PSDrive -Name Z -PSProvider FileSystem -Root '\\\\192.168.29.132\\Patches' -Persist"
 
     - name: Ensure C:\temp exists
       win_file:
-        path: 'C:\temp'
+        path: C:\temp
         state: directory
 
     - name: Copy Map.exe from Z: to C:\temp
-      win_command: >
-        powershell.exe -Command "Copy-Item 'Z:\\Map.exe' -Destination 'C:\\temp\\Map.exe' -Force"
+      win_command: powershell.exe -Command "Copy-Item 'Z:\\Map.exe' -Destination 'C:\\temp\\Map.exe' -Force"
 
     - name: Run Map.exe
-      win_command: 'C:\temp\Map.exe'
+      win_command: C:\temp\Map.exe
