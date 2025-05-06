@@ -3,7 +3,7 @@
   hosts: all
   gather_facts: yes
   vars:
-    drive_letter: 'Z:'
+    drive_letter: 'U:'
     share_path: '\\192.168.29.132\Patches'
   tasks:
     - name: Check if drive is already mapped
