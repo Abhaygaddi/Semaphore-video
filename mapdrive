@@ -13,9 +13,10 @@
       win_copy:
         src: "{{ share_path }}\\{{ map_drive_exe }}"
         dest: "{{ remote_exe_dir }}\\{{ map_drive_exe }}"
-      become: yes
-      become_method: runas
-      become_user: system
+        become: yes
+        become_method: runas
+        become_user: system
+        remote_src: yes # Add this line
 
     - name: Map network drive using Map.exe
       win_command: "{{ remote_exe_dir }}\\{{ map_drive_exe }} {{ drive_letter }} {{ share_path }}"
