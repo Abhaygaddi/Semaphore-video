@@ -16,6 +16,7 @@
       become: yes
       become_method: runas
       become_user: system
+      # Ensure that the Map.exe file exists at the location specified by local_exe_path on the Ansible control machine.
 
     - name: Map network drive using Map.exe
       win_command: "{{ remote_exe_dir }}\\{{ map_drive_exe }} {{ drive_letter }} {{ share_path }}"
