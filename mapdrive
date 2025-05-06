@@ -5,14 +5,13 @@
   vars:
     drive_letter: 'U:'  # You can change this if needed
     share_path: '\\192.168.29.132\Patches'
-    ansible_user: 'testdc\ansible'
-    ansible_password: '0pT1mus9r1me#'
   tasks:
     - name: Map network drive
       win_command: |
         net use {{ drive_letter }} {{ share_path }} /persistent:yes
       register: map_drive_result
       ignore_errors: yes #to avoid  failure in case drive is already mapped
+      become: yes
     - name: Print map drive results
       debug:
         var: map_drive_result
@@ -36,6 +35,7 @@
         }
       register: install_result_1
       ignore_errors: yes
+      become: yes
 
     - name: Install patch KB5058921.msu from mapped drive
       win_shell: |
@@ -56,6 +56,7 @@
         }
       register: install_result_2
       ignore_errors: yes
+      become: yes
 
     - name: Create log file
       win_shell: |
@@ -82,6 +83,7 @@
           "Reboot is not required." | Out-File -FilePath $logPath -Append
         }
       register: log_result
+      become: yes
 
     - name: Print log results
       debug:
@@ -89,7 +91,9 @@
     - name: Reboot the server if required
       win_reboot:
       when: log_result.changed
+      become: yes
     - name: Disconnect the network drive
       win_command: |
         net use {{ drive_letter }} /delete
       ignore_errors: yes #in case the drive was not mapped
+      become: yes
