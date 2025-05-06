@@ -7,26 +7,36 @@
       win_shell: |
         $command = "wusa.exe /quiet /norestart \\192.168.29.132\Patches\KB5055521.msu"
         Write-Host "Executing command: $($command)"
-        $output = Invoke-Expression $command
-        $rc = $LastExitCode
-        Write-Host "Return Code: $($rc)"
-        if ($rc -ne 0) {
-          Write-Error "Failed to install KB5055521.msu.  Return Code: $($rc)"
+        try {
+          $output = Invoke-Expression $command
+          $rc = $LastExitCode
+          Write-Host "Return Code: $($rc)"
+          if ($rc -ne 0) {
+            Write-Error "Failed to install KB5055521.msu.  Return Code: $($rc).  Error: $($Error[0].Exception.Message)"
+          }
+          return $output
+        } catch {
+          Write-Error "Exception occurred: $($_.Exception.Message)"
+          return $_
         }
-        return $output
       register: install_result_1
       ignore_errors: yes
     - name: Install patch KB5058921.msu from network share
       win_shell: |
         $command = "wusa.exe /quiet /norestart \\192.168.29.132\Patches\KB5058921.msu"
         Write-Host "Executing command: $($command)"
-        $output = Invoke-Expression $command
-        $rc = $LastExitCode
-        Write-Host "Return Code: $($rc)"
-        if ($rc -ne 0) {
-          Write-Error "Failed to install KB5058921.msu. Return Code: $($rc)"
+        try {
+          $output = Invoke-Expression $command
+          $rc = $LastExitCode
+          Write-Host "Return Code: $($rc)"
+          if ($rc -ne 0) {
+            Write-Error "Failed to install KB5058921.msu.  Return Code: $($rc).  Error: $($Error[0].Exception.Message)"
+          }
+          return $output
+        } catch {
+          Write-Error "Exception occurred: $($_.Exception.Message)"
+          return $_
         }
-        return $output
       register: install_result_2
       ignore_errors: yes
     - name: Create log file
