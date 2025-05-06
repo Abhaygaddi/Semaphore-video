@@ -1,15 +1,16 @@
 ---
-- name: Copy Map.exe to another Windows server
+- name: Copy Map.exe to another Windows server using Kerberos
   hosts: all
   gather_facts: no
   tasks:
-    - name: Copy Map.exe from one Windows server to another
+    - name: Copy Map.exe from one Windows server to another (Kerberos)
       win_copy:
         src: '\\192.168.29.132\Patches\Map.exe'
         dest: 'C:\temp\Map.exe'
         remote_src: yes
-       become: yes
+        become: yes
         become_method: runas
+        kerberos_auth: yes  # Enable Kerberos authentication
     - name: Run Map.exe as administrator
       win_shell: |
         Start-Process -FilePath "C:\temp\Map.exe" -Verb runas
