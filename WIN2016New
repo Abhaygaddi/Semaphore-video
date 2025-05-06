@@ -11,28 +11,28 @@
 
     - name: Copy Map.exe to Windows temp folder
       win_copy:
-        src: /path/to/Map.exe  # Change this to your local Ansible control path
+        src: /path/to/Map.exe  # <-- Change this to the local path on your Ansible control node
         dest: C:\temp\Map.exe
 
-    - name: Run Map.exe to map Z: to \\192.168.29.132\Patches
-      win_command: C:\temp\Map.exe
+    - name: Run Map.exe to map Z drive
+      win_command: 'C:\temp\Map.exe'
       register: map_drive
       failed_when: map_drive.rc != 0
 
-    - name: Wait for drive Z: to be available
-      win_command: "dir Z:\\"
+    - name: Wait for drive Z to be available
+      win_command: 'dir Z:\\'
       register: drive_check
       retries: 5
       delay: 3
       until: drive_check.rc == 0
 
     - name: Install patch KB5055521 using wusa
-      win_command: "wusa Z:\\KB5055521.msu /quiet /norestart"
+      win_command: 'wusa Z:\KB5055521.msu /quiet /norestart'
       register: patch1
       ignore_errors: true
 
     - name: Install patch KB5058921 using wusa
-      win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
+      win_command: 'wusa Z:\KB5058921.msu /quiet /norestart'
       register: patch2
       ignore_errors: true
 
