@@ -1,32 +1,85 @@
-- name: Ansible Copy Example Local to Remo
+---
+- name: Map Network Drive, Copy Patch, Install, and Disconnect
+  hosts: all
+  gather_facts: yes
+  vars:
+    drive_letter: 'U:'
+    share_path: '\\192.168.29.132\Patches'
+    local_patch_path: '/tmp/patches/KB5055521.msu' # Path on the Ansible control machine
+    remote_patch_dir: 'C:\Users\ansible'        # Directory on the Windows host
+  tasks:
+    - name: Map network drive
+      win_command: |
+        net use {{ drive_letter }} {{ share_path }} /persistent:yes
+      register: map_drive_result
+      ignore_errors: yes
+      become: yes
+      become_method: runas
+      become_user: system
+    - name: Print map drive results
+      debug:
+        var: map_drive_result
 
-	  hosts: windows
+    - name: Copy patch from Ansible host to Windows server
+      ansible.windows.win_copy:
+        src: "{{ local_patch_path }}"
+        dest: "{{ remote_patch_dir }}\KB5055521.msu"
+      when: ansible_facts.os_name == "Microsoft Windows Server 2016 Standard"
+      become: yes
+      become_method: runas
+      become_user: system
 
-	  tasks:
+    - name: Install hotfix without validating KB and Identifier
+      community.windows.win_hotfix:
+        source: "{{ remote_patch_dir }}\KB5055521.msu"
+        state: present
+      when: ansible_facts.os_name == "Microsoft Windows Server 2016 Standard"
+      register: hotfix_install_2016
+      become: yes
+      become_method: runas
+      become_user: system
+    - name: Print hotfix installation result
+      debug:
+        var: hotfix_install_2016
 
-	    
+    - name: Create log file
+      win_shell: |
+        $logPath = "C:\temp\patch_installation.log"
+        "KB5055521 Installation Result: $($hotfix_install_2016)" | Out-File -FilePath $logPath -Append
 
-	    - name: copying file from local ansible master host to remote Windows 2016 Datacenter servers
-
-	      ansible.windows.win_copy:
-
-	        src: /tmp/patches/KB5055521.msu
-
-	        dest: C:\Users\ansible
-
-	      when: ansible_facts['os_name'] == "Microsoft Windows Server 2016 Standard"
+        $rebootRequired = $false
 
 
-	    - name: install hotfix without validating the KB and Identifier
+        if ($hotfix_install_2016.reboot_required) {
+            $rebootRequired = $true
+            "KB5055521: Restart is needed" | Out-File -FilePath $logPath -Append
+        }
 
-	      community.windows.win_hotfix:
 
-	        source: C:\Users\ansible\KB5055521.msu
+        if ($rebootRequired -eq $true ) {
+          "Reboot is required." | Out-File -FilePath $logPath -Append
+        }
+        else {
+          "Reboot is not required." | Out-File -FilePath $logPath -Append
+        }
+      register: log_result
+      become: yes
+      become_method: runas
+      become_user: system
 
-	        state: present
-
-	      when: ansible_facts['os_name'] == "Microsoft Windows Server 2016 Standard"
-
-	      register: hotfix_install_2016
-
-	
+    - name: Print log results
+      debug:
+        var: log_result
+    - name: Reboot the server if required
+      win_reboot:
+      when: log_result.changed
+      become: yes
+      become_method: runas
+      become_user: system
+    - name: Disconnect the network drive
+      win_command: |
+        net use {{ drive_letter }} /delete
+      ignore_errors: yes
+      become: yes
+      become_method: runas
+      become_user: system
