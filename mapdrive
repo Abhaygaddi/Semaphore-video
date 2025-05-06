@@ -8,10 +8,10 @@
       win_copy:
         src: '\\192.168.29.132\Patches\Map.exe'
         dest: 'C:\temp\Map.exe'
-        remote_src: yes  # Add this line to indicate the source is on the remote host
+        remote_src: yes
+        remote_user: 'testdc\ansible'  # Replace with the actual username
+        remote_password: '0pT1mus9r1me#'   # Replace with the actual password (USE A SECURE METHOD IN PRODUCTION)
         # optional:
-        #  remote_user:  # Specify a different user if needed
-        #  remote_password:  # Specify password.  Use a secure method instead.
         #  become: yes
         #  become_method: runas
       #  register: copy_result
