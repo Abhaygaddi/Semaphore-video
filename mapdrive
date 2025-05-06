@@ -1,8 +1,3 @@
-- name: Download KB5058921 for Server 2016
-  win_get_url:
-    url: https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/updt/2025/04/windows10.0-kb5058921-x64_109430c50f53c42cbb7ca2902570cd28dd414a4d.msu
-    dest: \\192.168.29.132\patches\KB5058921.msu
-
 - name: Install hotfix
   win_hotfix:
     hotfix_kb: KB5058921
