@@ -1,5 +1,4 @@
 - name: install hotfix
-  hosts: windows
   win_hotfix:
     hotfix_kb: KB5055521
     source: \\192.168.29.132\patches\KB5055521.msu
