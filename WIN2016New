@@ -1,33 +1,43 @@
 ---
-- name: Map drive via Map.exe and install patches
+- name: Copy Map.exe and install Windows patches from mapped drive
   hosts: windows
   gather_facts: no
+
   tasks:
 
-    - name: Create C:\temp if it doesn't exist
+    - name: Ensure C:\temp exists
       win_file:
         path: C:\temp
         state: directory
 
-    - name: Copy Map.exe from share to local C:\temp
-      win_command: powershell.exe -Command "Copy-Item '\\\\192.168.29.132\\Patches\\Map.exe' -Destination 'C:\\temp\\Map.exe' -Force"
+    - name: Copy Map.exe from share to C:\temp
+      win_command: powershell.exe -Command "Copy-Item '\\192.168.29.132\Patches\Map.exe' -Destination 'C:\temp\Map.exe' -Force"
 
-    - name: Run Map.exe to map Z drive
-      win_command: 'C:\\temp\\Map.exe'
+    - name: Run Map.exe to map Z: drive
+      win_command: C:\temp\Map.exe
 
-    - name: Install patch KB5055521 from Z drive
-      win_command: "wusa Z:\\\\KB5055521.msu /quiet /norestart"
-      register: install_kb5055521
+    - name: Install patch KB5055521
+      win_command: wusa Z:\KB5055521.msu /quiet /norestart
+      register: patch_1
       ignore_errors: yes
-      failed_when: install_kb5055521.rc != 0
 
-    - name: Install patch KB5058921 from Z drive
-      win_command: "wusa Z:\\\\KB5058921.msu /quiet /norestart"
-      register: install_kb5058921
+    - name: Install patch KB5058921
+      win_command: wusa Z:\KB5058921.msu /quiet /norestart
+      register: patch_2
       ignore_errors: yes
-      failed_when: install_kb5058921.rc != 0
 
-    - name: Reboot if any patch installed
+    - name: Log results for KB5055521
+      win_lineinfile:
+        path: C:\temp\patch_install_log.txt
+        line: "{{ ansible_date_time.iso8601 }} : KB5055521 : rc={{ patch_1.rc }}"
+
+    - name: Log results for KB5058921
+      win_lineinfile:
+        path: C:\temp\patch_install_log.txt
+        line: "{{ ansible_date_time.iso8601 }} : KB5058921 : rc={{ patch_2.rc }}"
+
+    - name: Reboot if any patch was installed
       win_reboot:
         reboot_timeout: 600
-      when: install_kb5055521.rc == 0 or install_kb5058921.rc == 0
+        test_command: echo Reboot complete
+      when: patch_1.rc == 0 or patch_2.rc == 0
