@@ -12,6 +12,8 @@
       register: map_drive_result
       ignore_errors: yes #to avoid  failure in case drive is already mapped
       become: yes
+      become_method: runas
+      become_user: system
     - name: Print map drive results
       debug:
         var: map_drive_result
@@ -36,6 +38,8 @@
       register: install_result_1
       ignore_errors: yes
       become: yes
+      become_method: runas
+      become_user: system
 
     - name: Install patch KB5058921.msu from mapped drive
       win_shell: |
@@ -57,6 +61,8 @@
       register: install_result_2
       ignore_errors: yes
       become: yes
+      become_method: runas
+      become_user: system
 
     - name: Create log file
       win_shell: |
@@ -84,6 +90,8 @@
         }
       register: log_result
       become: yes
+      become_method: runas
+      become_user: system
 
     - name: Print log results
       debug:
@@ -92,8 +100,12 @@
       win_reboot:
       when: log_result.changed
       become: yes
+      become_method: runas
+      become_user: system
     - name: Disconnect the network drive
       win_command: |
         net use {{ drive_letter }} /delete
       ignore_errors: yes #in case the drive was not mapped
       become: yes
+      become_method: runas
+      become_user: system
