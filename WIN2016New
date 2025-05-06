@@ -1,43 +1,34 @@
 ---
-- name: Map drive via EXE and install patches
+- name: Map drive via Map.exe and install patches
   hosts: windows
-  gather_facts: yes
+  gather_facts: no
+
   tasks:
 
-    - name: Ensure temp directory exists
+    - name: Create C:\temp if it doesn't exist
       win_file:
         path: C:\temp
         state: directory
 
-    - name: Copy Map.exe to Windows temp folder
-      win_copy:
-        src: //192.168.29.132/Patches/Map.exe  # <-- Change this to the local path on your Ansible control node
-        dest: C:\temp\Map.exe
+    - name: Copy Map.exe from share to local C:\temp
+      win_command: powershell.exe -Command "Copy-Item '\\192.168.29.132\Patches\Map.exe' -Destination 'C:\temp\Map.exe' -Force"
 
-    - name: Run Map.exe to map Z drive
+    - name: Run Map.exe to map Z: drive
       win_command: 'C:\temp\Map.exe'
-      register: map_drive
-      failed_when: map_drive.rc != 0
 
-    - name: Wait for drive Z to be available
-      win_command: 'dir Z:\\'
-      register: drive_check
-      retries: 5
-      delay: 3
-      until: drive_check.rc == 0
+    - name: Install patch KB5055521 from Z: drive
+      win_command: "wusa Z:\\KB5055521.msu /quiet /norestart"
+      register: install_kb5055521
+      ignore_errors: yes
+      failed_when: install_kb5055521.rc != 0
 
-    - name: Install patch KB5055521 using wusa
-      win_command: 'wusa Z:\KB5055521.msu /quiet /norestart'
-      register: patch1
-      ignore_errors: true
+    - name: Install patch KB5058921 from Z: drive
+      win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
+      register: install_kb5058921
+      ignore_errors: yes
+      failed_when: install_kb5058921.rc != 0
 
-    - name: Install patch KB5058921 using wusa
-      win_command: 'wusa Z:\KB5058921.msu /quiet /norestart'
-      register: patch2
-      ignore_errors: true
-
-    - name: Reboot the server if any patch was installed
+    - name: Reboot if any patch installed
       win_reboot:
         reboot_timeout: 600
-        test_command: 'echo Reboot completed'
-      when: patch1.rc == 0 or patch2.rc == 0
+      when: install_kb5055521.rc == 0 or install_kb5058921.rc == 0
