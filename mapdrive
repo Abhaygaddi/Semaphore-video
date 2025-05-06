@@ -1,21 +1,30 @@
 ---
-- name: Install Windows Patches from Network Share with Logging and Reboot
+- name: Map Network Drive and Install Windows Patches
   hosts: all
   gather_facts: no
+  vars:
+    drive_letter: 'U:'  # You can change this if needed
+    share_path: '\\192.168.29.132\Patches'
   tasks:
-    - name: Install patch KB5055521.msu from network share
+    - name: Map network drive
+      win_command: |
+        net use {{ drive_letter }} {{ share_path }} /persistent:yes
+      register: map_drive_result
+      ignore_errors: yes #to avoid  failure in case drive is already mapped
+    - name: Print map drive results
+      debug:
+        var: map_drive_result
+
+    - name: Install patch KB5055521.msu from mapped drive
       win_shell: |
-        $command = "wusa.exe /quiet /norestart \\192.168.29.132\Patches\KB5055521.msu"
+        $command = "wusa.exe /quiet /norestart {{ drive_letter }}\KB5055521.msu"
         Write-Host "Executing command: $($command)"
         try {
-          $output = Invoke-Expression $command
+          $output = Invoke-Expression $command 2>&1
           $rc = $LastExitCode
           Write-Host "Return Code: $($rc)"
           if ($rc -ne 0) {
-            $errorMessage = "Failed to install KB5055521.msu.  Return Code: $($rc)"
-            if ($Error.Count -gt 0) {
-                  $errorMessage += "  Error: $($Error[0].Exception.Message)"
-            }
+            $errorMessage = "Failed to install KB5055521.msu.  Return Code: $($rc).  Output: $($output)"
             Write-Error $errorMessage
           }
           return $output
@@ -25,19 +34,17 @@
         }
       register: install_result_1
       ignore_errors: yes
-    - name: Install patch KB5058921.msu from network share
+
+    - name: Install patch KB5058921.msu from mapped drive
       win_shell: |
-        $command = "wusa.exe /quiet /norestart \\192.168.29.132\Patches\KB5058921.msu"
+        $command = "wusa.exe /quiet /norestart {{ drive_letter }}\KB5058921.msu"
         Write-Host "Executing command: $($command)"
         try {
-          $output = Invoke-Expression $command
+          $output = Invoke-Expression $command 2>&1
           $rc = $LastExitCode
           Write-Host "Return Code: $($rc)"
           if ($rc -ne 0) {
-            $errorMessage = "Failed to install KB5058921.msu.  Return Code: $($rc)"
-            if ($Error.Count -gt 0) {
-                  $errorMessage += "  Error: $($Error[0].Exception.Message)"
-            }
+            $errorMessage = "Failed to install KB5058921.msu.  Return Code: $($rc).  Output: $($output)"
             Write-Error $errorMessage
           }
           return $output
@@ -47,6 +54,7 @@
         }
       register: install_result_2
       ignore_errors: yes
+
     - name: Create log file
       win_shell: |
         $logPath = "C:\temp\patch_installation.log"
@@ -72,9 +80,14 @@
           "Reboot is not required." | Out-File -FilePath $logPath -Append
         }
       register: log_result
+
     - name: Print log results
       debug:
         var: log_result
     - name: Reboot the server if required
       win_reboot:
       when: log_result.changed
+    - name: Disconnect the network drive
+      win_command: |
+        net use {{ drive_letter }} /delete
+      ignore_errors: yes #in case the drive was not mapped
