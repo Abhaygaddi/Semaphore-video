@@ -1,21 +1,18 @@
 ---
 - name: Copy Map.exe to remote hosts
-  hosts: all  # Specify the target hosts or group
+  hosts: all
   gather_facts: no
-
   tasks:
     - name: Copy Map.exe from network share
       win_copy:
         src: '\\192.168.29.132\Patches\Map.exe'
         dest: 'C:\temp\Map.exe'
         remote_src: yes
-        remote_user: 'testdc\ansible'  # Replace with the actual username
-        remote_password: '0pT1mus9r1me#'   # Replace with the actual password (USE A SECURE METHOD IN PRODUCTION)
-        # optional:
-        #  become: yes
-        #  become_method: runas
-      #  register: copy_result
-
+        remote_user: 'ansible'  # Changed to just the username
+        remote_password: '0pT1mus9r1me#'
+        become: yes             # Add this
+        become_method: runas    # And this
+      # register: copy_result
     # - name: Print the result
     #   debug:
     #     var: copy_result
