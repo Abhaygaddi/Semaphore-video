@@ -5,12 +5,30 @@
   tasks:
     - name: Install patch KB5055521.msu from network share
       win_shell: |
-        wusa.exe /quiet /norestart \\192.168.29.132\Patches\KB5055521.msu
+        $command = "wusa.exe /quiet /norestart \\192.168.29.132\Patches\KB5055521.msu"
+        Write-Host "Executing command: $($command)"
+        $output = Invoke-Expression $command
+        $rc = $LastExitCode
+        Write-Host "Return Code: $($rc)"
+        if ($rc -ne 0) {
+          Write-Error "Failed to install KB5055521.msu.  Return Code: $($rc)"
+        }
+        return $output
       register: install_result_1
+      ignore_errors: yes
     - name: Install patch KB5058921.msu from network share
       win_shell: |
-        wusa.exe /quiet /norestart \\192.168.29.132\Patches\KB5058921.msu
+        $command = "wusa.exe /quiet /norestart \\192.168.29.132\Patches\KB5058921.msu"
+        Write-Host "Executing command: $($command)"
+        $output = Invoke-Expression $command
+        $rc = $LastExitCode
+        Write-Host "Return Code: $($rc)"
+        if ($rc -ne 0) {
+          Write-Error "Failed to install KB5058921.msu. Return Code: $($rc)"
+        }
+        return $output
       register: install_result_2
+      ignore_errors: yes
     - name: Create log file
       win_shell: |
         $logPath = "C:\temp\patch_installation.log"
@@ -35,7 +53,7 @@
         else {
           "Reboot is not required." | Out-File -FilePath $logPath -Append
         }
-      register: log_result #register the output
+      register: log_result
     - name: Print log results
       debug:
         var: log_result
