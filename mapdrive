@@ -1,4 +1,4 @@
-- hosts: windows_servers
+- hosts: windows
   tasks:
     - name: Install patch from shared location
       win_package:
