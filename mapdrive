@@ -1,12 +1,10 @@
 ---
-- name: Map Network Drive, Copy Patch, Install, and Disconnect
+- name: Map Network Drive, Install Patch from Share, and Disconnect
   hosts: all
   gather_facts: yes
   vars:
     drive_letter: 'U:'
     share_path: '\\192.168.29.132\Patches'
-    local_patch_path: '/tmp/patches/KB5055521.msu' # Path on the Ansible control machine
-    remote_patch_dir: 'C:\Users\ansible'        # Directory on the Windows host
   tasks:
     - name: Map network drive
       win_command: |
@@ -20,24 +18,16 @@
       debug:
         var: map_drive_result
 
-    - name: Copy patch from Ansible host to Windows server
-      ansible.windows.win_copy:
-        src: "{{ local_patch_path }}"
-        dest: "{{ remote_patch_dir }}\\KB5055521.msu"
-      when: ansible_facts.os_name == "Microsoft Windows Server 2016 Standard"
-      become: yes
-      become_method: runas
-      become_user: system
-
-    - name: Install hotfix without validating KB and Identifier
+    - name: Install hotfix from shared location
       community.windows.win_hotfix:
-        source: "{{ remote_patch_dir }}\\KB5055521.msu"
+        source: "{{ drive_letter }}:\\KB5055521.msu"
         state: present
       when: ansible_facts.os_name == "Microsoft Windows Server 2016 Standard"
       register: hotfix_install_2016
       become: yes
       become_method: runas
       become_user: system
+
     - name: Print hotfix installation result
       debug:
         var: hotfix_install_2016
