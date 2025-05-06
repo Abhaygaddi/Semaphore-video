@@ -6,23 +6,39 @@
     drive_letter: 'U:'
     share_path: '\\192.168.29.132\Patches'
   tasks:
+    - name: Check if drive is already mapped
+      win_command: |
+        if (Get-PSDrive -Name {{ drive_letter }} -ErrorAction SilentlyContinue) {
+          Write-Host "{{ drive_letter }} is already mapped"
+          exit 0
+        } else {
+          Write-Host "{{ drive_letter }} is not mapped"
+          exit 1
+        }
+      register: drive_check_result
+      changed_when: false
+      failed_when: drive_check_result.rc > 1
+
     - name: Map network drive
       win_command: |
         net use {{ drive_letter }} {{ share_path }} /persistent:yes
       register: map_drive_result
-      ignore_errors: yes
+      ignore_errors: yes #to avoid  failure in case drive is already mapped
       become: yes
       become_method: runas
       become_user: system
+      when: drive_check_result.rc == 1
     - name: Print map drive results
       debug:
         var: map_drive_result
+      when: drive_check_result.rc == 1
 
     - name: Install hotfix from shared location
       community.windows.win_hotfix:
         source: "{{ drive_letter }}:\\KB5055521.msu"
         state: present
-      when: ansible_facts.os_name == "Microsoft Windows Server 2016 Standard"
+      when:
+        - ansible_facts.os_name == "Microsoft Windows Server 2016 Standard"
       register: hotfix_install_2016
       become: yes
       become_method: runas
