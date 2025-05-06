@@ -1,7 +1,7 @@
     ---
     - hosts: windows
       become: yes  # You might need to use the appropriate 'become' or 'become_method' based on your system
-      gather_facts: no  # You might not need to gather facts for this
+      gather_facts: yes  # You might not need to gather facts for this
       tasks:
         - name: Install hotfix
           community.windows.win_hotfix:
