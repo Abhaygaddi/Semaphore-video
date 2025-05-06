@@ -6,17 +6,16 @@
     drive_letter: 'U:'
     share_path: '\\192.168.29.132\Patches'
     map_drive_exe: 'Map.exe' # Name of the executable
-    local_exe_path: '/tmp/Map.exe' # Path to the executable on the Ansible control machine
+    # local_exe_path: '/tmp/Map.exe' # Path to the executable on the Ansible control machine - no longer used
     remote_exe_dir: 'C:\temp' # Directory to copy the executable to on the Windows host
   tasks:
-    - name: Copy Map.exe to the remote machine
+    - name: Copy Map.exe to the remote machine from network share
       win_copy:
-        src: "{{ local_exe_path }}"
+        src: "{{ share_path }}\\{{ map_drive_exe }}"
         dest: "{{ remote_exe_dir }}\\{{ map_drive_exe }}"
       become: yes
       become_method: runas
       become_user: system
-      # Ensure that the Map.exe file exists at the location specified by local_exe_path on the Ansible control machine.
 
     - name: Map network drive using Map.exe
       win_command: "{{ remote_exe_dir }}\\{{ map_drive_exe }} {{ drive_letter }} {{ share_path }}"
