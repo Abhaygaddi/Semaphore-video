@@ -1,10 +1,12 @@
-- name: Install hotfix
-  win_hotfix:
-    hotfix_kb: KB5058921
-    source: \\192.168.29.132\patches\KB5058921.msu
-    state: present
-  register: hotfix_result
-
-- name: Reboot host if required
-  win_reboot:
-  when: hotfix_result.reboot_required
+    ---
+    - hosts: windows
+      become: yes  # You might need to use the appropriate 'become' or 'become_method' based on your system
+      gather_facts: no  # You might not need to gather facts for this
+      tasks:
+        - name: Install hotfix
+          community.windows.win_hotfix:
+            source: \\192.168.29.132\patches\KB5058921.msu
+          # Optional parameters:
+          #   force: yes  # Force the installation even if the system detects it's already installed
+          #   validate: no # Disable KB and Identifier validation
+          #   ignore_errors: yes # Ignore errors during installation
