@@ -1,10 +1,44 @@
-- name: Map drive Z
-  win_mapped_drive:
-    letter: Z
-    path: "\\\\192.168.29.132\\Patches"
-    state: present
-    username: "testdc\\ansible"
-    password: "0pT1mus9r1me#"
+---
+- name: Map drive, copy Map.exe, install patches, and reboot
+  hosts: windows
+  gather_facts: no
+  tasks:
 
-- name: Copy Map.exe from mapped drive
-  win_command: powershell.exe -Command "Copy-Item 'Z:\\Map.exe' -Destination 'C:\\temp\\Map.exe' -Force"
+    - name: Map network drive Z:
+      win_mapped_drive:
+        letter: Z
+        path: "\\\\192.168.29.132\\Patches"
+        state: present
+        username: "testdc\\ansible"
+        password: "0pT1mus9r1me#"
+
+    - name: Create temp directory if not exists
+      win_file:
+        path: C:\temp
+        state: directory
+
+    - name: Copy Map.exe from mapped drive to C:\temp
+      win_command: powershell.exe -Command "Copy-Item 'Z:\\Map.exe' -Destination 'C:\\temp\\Map.exe' -Force"
+
+    - name: Run Map.exe to map Z: drive persistently
+      win_command: "C:\\temp\\Map.exe"
+
+    - name: Install patch KB5055521
+      win_command: "wusa Z:\\KB5055521.msu /quiet /norestart"
+      register: install_kb1
+      ignore_errors: yes
+
+    - name: Install patch KB5058921
+      win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
+      register: install_kb2
+      ignore_errors: yes
+
+    - name: Reboot if any patch was installed
+      win_reboot:
+        reboot_timeout: 600
+      when: install_kb1.rc == 0 or install_kb2.rc == 0
+
+    - name: Unmap network drive Z
+      win_mapped_drive:
+        letter: Z
+        state: absent
