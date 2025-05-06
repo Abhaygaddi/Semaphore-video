@@ -1,17 +1,12 @@
----
-
-- name: Install hotfix
+- name: install hotfix
   hosts: windows
-  gather_facts: True
-
-  tasks:
-  - name: Install Windows 2016 Patch File
-    win_hotfix:
-      source: \\192.168.29.132\patches\KB5055521.msu
-      state: present
-    register: hotfix_install
-
-  - win_reboot:
-    when: hotfix_install.reboot_required
-
-...
+  win_hotfix:
+    hotfix_kb: KB5055521
+    source: \\192.168.29.132\patches\KB5055521.msu
+    state: present
+  become: yes
+  become_method: runas
+  become_flags: logon_type=new_credentials logon_flags=netcredentials_only
+  vars:
+    ansible_become_user: testdc\ansible
+    ansible_become_pass: 0pT1musr91me#
