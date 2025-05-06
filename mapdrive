@@ -1,19 +1,19 @@
 ---
-- name: Copy Map.exe to remote hosts and run as administrator
-  hosts: all
+- name: Map network drive and run Map.exe
+  hosts: windows
   gather_facts: no
   tasks:
-    - name: Copy Map.exe from network share
-      win_copy:
-        src: '\\192.168.29.132\Patches\Map.exe'
-        dest: 'C:\temp\Map.exe'
-        remote_src: yes
-        remote_user: 'ansible'
-        remote_password: '0pT1mus9r1me#'
-        become: yes
-        become_method: runas
-    - name: Run Map.exe as administrator
-      win_shell: |
-        Start-Process -FilePath "C:\temp\Map.exe" -Verb runas
-      become: yes
-      become_method: runas
+
+    - name: Map Z: drive to UNC path
+      win_command: powershell.exe -Command "New-PSDrive -Name Z -PSProvider FileSystem -Root '\\\\192.168.29.132\\Patches' -Persist"
+
+    - name: Ensure C:\temp exists
+      win_file:
+        path: C:\temp
+        state: directory
+
+    - name: Copy Map.exe from Z: to C:\temp
+      win_command: powershell.exe -Command "Copy-Item 'Z:\\Map.exe' -Destination 'C:\\temp\\Map.exe' -Force"
+
+    - name: Run Map.exe
+      win_command: C:\temp\Map.exe
