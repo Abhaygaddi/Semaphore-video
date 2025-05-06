@@ -1,111 +1,32 @@
----
-- name: Map Network Drive and Install Windows Patches
-  hosts: all
-  gather_facts: no
-  vars:
-    drive_letter: 'U:'  # You can change this if needed
-    share_path: '\\192.168.29.132\Patches'
-  tasks:
-    - name: Map network drive
-      win_command: |
-        net use {{ drive_letter }} {{ share_path }} /persistent:yes
-      register: map_drive_result
-      ignore_errors: yes #to avoid  failure in case drive is already mapped
-      become: yes
-      become_method: runas
-      become_user: system
-    - name: Print map drive results
-      debug:
-        var: map_drive_result
+- name: Ansible Copy Example Local to Remo
 
-    - name: Install patch KB5055521.msu from mapped drive
-      win_shell: |
-        $command = "wusa.exe /quiet /norestart {{ drive_letter }}:\\KB5055521.msu"
-        Write-Host "Executing command: $($command)"
-        try {
-          $output = Invoke-Expression $command 2>&1
-          $rc = $LastExitCode
-          Write-Host "Return Code: $($rc)"
-          if ($rc -ne 0) {
-            $errorMessage = "Failed to install KB5055521.msu.  Return Code: $($rc).  Output: $($output)"
-            Write-Error $errorMessage
-          }
-          return $output
-        } catch {
-          Write-Error "Exception occurred: $($_.Exception.Message)"
-          return $_
-        }
-      register: install_result_1
-      ignore_errors: yes
-      become: yes
-      become_method: runas
-      become_user: system
+	  hosts: windows
 
-    - name: Install patch KB5058921.msu from mapped drive
-      win_shell: |
-        $command = "wusa.exe /quiet /norestart {{ drive_letter }}:\\KB5058921.msu"
-        Write-Host "Executing command: $($command)"
-        try {
-          $output = Invoke-Expression $command 2>&1
-          $rc = $LastExitCode
-          Write-Host "Return Code: $($rc)"
-          if ($rc -ne 0) {
-            $errorMessage = "Failed to install KB5058921.msu.  Return Code: $($rc).  Output: $($output)"
-            Write-Error $errorMessage
-          }
-          return $output
-        } catch {
-          Write-Error "Exception occurred: $($_.Exception.Message)"
-          return $_
-        }
-      register: install_result_2
-      ignore_errors: yes
-      become: yes
-      become_method: runas
-      become_user: system
+	  tasks:
 
-    - name: Create log file
-      win_shell: |
-        $logPath = "C:\temp\patch_installation.log"
-        "KB5055521 Installation Result: $($install_result_1.stdout) $($install_result_1.stderr) Return Code: $($install_result_1.rc)" | Out-File -FilePath $logPath -Append
-        "KB5058921 Installation Result: $($install_result_2.stdout) $($install_result_2.stderr) Return Code: $($install_result_2.rc)" | Out-File -FilePath $logPath -Append
+	    
 
-        $rebootRequired1 = $false
-        $rebootRequired2 = $false
+	    - name: copying file from local ansible master host to remote Windows 2016 Datacenter servers
 
-        if ($install_result_1.stdout -like "*Restart needed*") {
-            $rebootRequired1 = $true
-            "KB5055521: Restart is needed" | Out-File -FilePath $logPath -Append
-        }
-        if ($install_result_2.stdout -like "*Restart needed*") {
-            $rebootRequired2 = $true
-            "KB5058921: Restart is needed" | Out-File -FilePath $logPath -Append
-        }
+	      ansible.windows.win_copy:
 
-        if ($rebootRequired1 -eq $true -or $rebootRequired2 -eq $true) {
-          "Reboot is required." | Out-File -FilePath $logPath -Append
-        }
-        else {
-          "Reboot is not required." | Out-File -FilePath $logPath -Append
-        }
-      register: log_result
-      become: yes
-      become_method: runas
-      become_user: system
+	        src: /tmp/patches/KB5055521.msu
 
-    - name: Print log results
-      debug:
-        var: log_result
-    - name: Reboot the server if required
-      win_reboot:
-      when: log_result.changed
-      become: yes
-      become_method: runas
-      become_user: system
-    - name: Disconnect the network drive
-      win_command: |
-        net use {{ drive_letter }} /delete
-      ignore_errors: yes #in case the drive was not mapped
-      become: yes
-      become_method: runas
-      become_user: system
+	        dest: C:\Users\ansible
+
+	      when: ansible_facts['os_name'] == "Microsoft Windows Server 2016 Standard"
+
+
+	    - name: install hotfix without validating the KB and Identifier
+
+	      community.windows.win_hotfix:
+
+	        source: C:\Users\ansible\KB5055521.msu
+
+	        state: present
+
+	      when: ansible_facts['os_name'] == "Microsoft Windows Server 2016 Standard"
+
+	      register: hotfix_install_2016
+
+	
