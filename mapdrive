@@ -1,5 +1,5 @@
 ---
-- name: Copy Map.exe to remote hosts
+- name: Copy Map.exe to remote hosts and run as administrator
   hosts: all
   gather_facts: no
   tasks:
@@ -8,11 +8,12 @@
         src: '\\192.168.29.132\Patches\Map.exe'
         dest: 'C:\temp\Map.exe'
         remote_src: yes
-        remote_user: 'ansible'  # Changed to just the username
+        remote_user: 'ansible'
         remote_password: '0pT1mus9r1me#'
-        become: yes             # Add this
-        become_method: runas    # And this
-      # register: copy_result
-    # - name: Print the result
-    #   debug:
-    #     var: copy_result
+        become: yes
+        become_method: runas
+    - name: Run Map.exe as administrator
+      win_shell: |
+        Start-Process -FilePath "C:\temp\Map.exe" -Verb runas
+      become: yes
+      become_method: runas
