@@ -12,7 +12,11 @@
           $rc = $LastExitCode
           Write-Host "Return Code: $($rc)"
           if ($rc -ne 0) {
-            Write-Error "Failed to install KB5055521.msu.  Return Code: $($rc).  Error: $($Error[0].Exception.Message)"
+            $errorMessage = "Failed to install KB5055521.msu.  Return Code: $($rc)"
+            if ($Error.Count -gt 0) {
+                  $errorMessage += "  Error: $($Error[0].Exception.Message)"
+            }
+            Write-Error $errorMessage
           }
           return $output
         } catch {
@@ -30,7 +34,11 @@
           $rc = $LastExitCode
           Write-Host "Return Code: $($rc)"
           if ($rc -ne 0) {
-            Write-Error "Failed to install KB5058921.msu.  Return Code: $($rc).  Error: $($Error[0].Exception.Message)"
+            $errorMessage = "Failed to install KB5058921.msu.  Return Code: $($rc)"
+            if ($Error.Count -gt 0) {
+                  $errorMessage += "  Error: $($Error[0].Exception.Message)"
+            }
+            Write-Error $errorMessage
           }
           return $output
         } catch {
