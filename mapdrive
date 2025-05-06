@@ -1,11 +1,15 @@
-- name: install hotfix
-  win_updates:
-    hotfix_kb: KB5055521
-    source: \\192.168.29.132\patches\KB5055521.msu
+- name: Download KB5058921 for Server 2016
+  win_get_url:
+    url: https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/updt/2025/04/windows10.0-kb5058921-x64_109430c50f53c42cbb7ca2902570cd28dd414a4d.msu
+    dest: \\192.168.29.132\patches\KB5058921.msu
+
+- name: Install hotfix
+  win_hotfix:
+    hotfix_kb: KB5058921
+    source: \\192.168.29.132\patches\KB5058921.msu
     state: present
-  become: yes
-  become_method: runas
-  become_flags: logon_type=new_credentials logon_flags=netcredentials_only
-  vars:
-    ansible_become_user: testdc\ansible
-    ansible_become_pass: 0pT1musr91me#
+  register: hotfix_result
+
+- name: Reboot host if required
+  win_reboot:
+  when: hotfix_result.reboot_required
