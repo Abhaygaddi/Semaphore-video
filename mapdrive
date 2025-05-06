@@ -1,7 +1,7 @@
 ---
 
 - name: Install hotfix
-  hosts: MyTargetHost
+  hosts: windows
   gather_facts: True
 
   tasks:
