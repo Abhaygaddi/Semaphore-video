@@ -1,18 +1,20 @@
 ---
-- name: Map network drive and execute Map.exe
-  hosts: WIN2016
-  gather_facts: no
+- name: Copy Map.exe to remote hosts
+  hosts: all  # Specify the target hosts or group
+  gather_facts: no # set to no to improve speed
+
   tasks:
-    - name: Map Z: drive to UNC path
-      win_command: powershell.exe -Command "New-PSDrive -Name Z -PSProvider FileSystem -Root '\\\\192.168.29.132\\Patches' -Persist"
+    - name: Copy Map.exe
+      win_copy:
+        src: '\\192.168.29.132\Patches\Map.exe'  # Use double quotes and escape backslashes
+        dest: 'C:\temp\Map.exe'
+        # optional:
+        #  remote_user:  # Specify a different user if needed
+        #  remote_pass:  # Specify password.  Use a secure method instead.
+        #  become: yes       #  If you need to run with elevated privileges
+        #  become_method: runas #  If you need to use runas
+      #  register: copy_result #register the output
 
-    - name: Ensure C:\temp exists
-      win_file:
-        path: C:\temp
-        state: directory
-
-    - name: Copy Map.exe from Z: to C:\temp
-      win_command: powershell.exe -Command "Copy-Item 'Z:\\Map.exe' -Destination 'C:\\temp\\Map.exe' -Force"
-
-    - name: Run Map.exe
-      win_command: C:\temp\Map.exe
+    # - name: Print the result (optional, for debugging)
+    #   debug:
+    #     var: copy_result
