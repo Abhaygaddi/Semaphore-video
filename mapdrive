@@ -1,6 +1,17 @@
-- hosts: windows
+---
+
+- name: Install hotfix
+  hosts: MyTargetHost
+  gather_facts: True
+
   tasks:
-    - name: Install patch from shared location
-      win_package:
-        name:  '\\\\192.168.29.132\\patches\\KB5055521.msu'  # Replace with the actual path
-        state: present
+  - name: Install Windows 2016 Patch File
+    win_hotfix:
+      source: \\192.168.29.132\patches\KB5055521.msu
+      state: present
+    register: hotfix_install
+
+  - win_reboot:
+    when: hotfix_install.reboot_required
+
+...
