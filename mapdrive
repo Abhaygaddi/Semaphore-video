@@ -8,6 +8,7 @@
     map_drive_exe: 'Map.exe' # Name of the executable
     # local_exe_path: '/tmp/Map.exe' # Path to the executable on the Ansible control machine - no longer used
     remote_exe_dir: 'C:\temp' # Directory to copy the executable to on the Windows host
+    domain_admin: 'testdc\ansible' # Add this line, replace with actual domain and user
   tasks:
     - name: Copy Map.exe to the remote machine from network share
       win_copy:
@@ -15,8 +16,9 @@
         dest: "{{ remote_exe_dir }}\\{{ map_drive_exe }}"
         become: yes
         become_method: runas
-        become_user: system
-        remote_src: yes # Add this line
+        become_user: "{{ domain_admin }}" # Use the variable here
+        remote_src: yes
+      #  become_user: Administrator #removed
 
     - name: Map network drive using Map.exe
       win_command: "{{ remote_exe_dir }}\\{{ map_drive_exe }} {{ drive_letter }} {{ share_path }}"
