@@ -2,7 +2,6 @@
 - name: Map drive via Map.exe and install patches
   hosts: windows
   gather_facts: no
-
   tasks:
 
     - name: Create C:\temp if it doesn't exist
@@ -11,19 +10,19 @@
         state: directory
 
     - name: Copy Map.exe from share to local C:\temp
-      win_command: powershell.exe -Command "Copy-Item '\\192.168.29.132\Patches\Map.exe' -Destination 'C:\temp\Map.exe' -Force"
+      win_command: powershell.exe -Command "Copy-Item '\\\\192.168.29.132\\Patches\\Map.exe' -Destination 'C:\\temp\\Map.exe' -Force"
 
-    - name: Run Map.exe to map Z: drive
-      win_command: 'C:\temp\Map.exe'
+    - name: Run Map.exe to map Z drive
+      win_command: 'C:\\temp\\Map.exe'
 
-    - name: Install patch KB5055521 from Z: drive
-      win_command: "wusa Z:\\KB5055521.msu /quiet /norestart"
+    - name: Install patch KB5055521 from Z drive
+      win_command: "wusa Z:\\\\KB5055521.msu /quiet /norestart"
       register: install_kb5055521
       ignore_errors: yes
       failed_when: install_kb5055521.rc != 0
 
-    - name: Install patch KB5058921 from Z: drive
-      win_command: "wusa Z:\\KB5058921.msu /quiet /norestart"
+    - name: Install patch KB5058921 from Z drive
+      win_command: "wusa Z:\\\\KB5058921.msu /quiet /norestart"
       register: install_kb5058921
       ignore_errors: yes
       failed_when: install_kb5058921.rc != 0
