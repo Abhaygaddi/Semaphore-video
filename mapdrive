@@ -17,7 +17,7 @@
 
     - name: Install patch KB5055521.msu from mapped drive
       win_shell: |
-        $command = "wusa.exe /quiet /norestart {{ drive_letter }}\KB5055521.msu"
+        $command = "wusa.exe /quiet /norestart {{ drive_letter }}:\KB5055521.msu"
         Write-Host "Executing command: $($command)"
         try {
           $output = Invoke-Expression $command 2>&1
@@ -37,7 +37,7 @@
 
     - name: Install patch KB5058921.msu from mapped drive
       win_shell: |
-        $command = "wusa.exe /quiet /norestart {{ drive_letter }}\KB5058921.msu"
+        $command = "wusa.exe /quiet /norestart {{ drive_letter }}:\KB5058921.msu"
         Write-Host "Executing command: $($command)"
         try {
           $output = Invoke-Expression $command 2>&1
