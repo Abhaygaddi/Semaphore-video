@@ -1,7 +1,6 @@
 ---
 - hosts: all
-  become: yes
-  gather_facts: no
+  gather_facts: no  # optional
   tasks:
     - name: Execute Windows Update Script from Shared Drive
       win_shell: |
