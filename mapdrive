@@ -1,13 +1,7 @@
----
-- hosts: all
-  gather_facts: no  # optional
-  tasks:
-    - name: Execute Windows Update Script from Shared Drive
-      win_shell: |
-        powershell.exe -ExecutionPolicy Bypass -File "\\192.168.29.132\Patches\Patch.ps1"
-      register: update_result
-      ignore_errors: yes
-
-    - name: Display update result
-      debug:
-        var: update_result
+- name: Map share and run patch script
+  win_shell: |
+    $cred = New-Object System.Management.Automation.PSCredential ("testdc\\ansible", (ConvertTo-SecureString "0pT1mus9r1me#" -AsPlainText -Force))
+    New-PSDrive -Name "Z" -PSProvider FileSystem -Root "\\192.168.29.132\Patches" -Credential $cred -Persist
+    powershell.exe -ExecutionPolicy Bypass -File "Z:\Patch.ps1"
+  register: update_result
+  ignore_errors: yes
