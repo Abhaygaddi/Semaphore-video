@@ -1,7 +1,7 @@
 ---
 - name: Install patches from network share
   hosts: windows
-  gather_facts: no  # Keep it 'no' if you don't need to gather facts
+  gather_facts: yes
   
   tasks:
     - name: Map network drive Z
@@ -11,11 +11,11 @@
         state: present
 
     - name: Install Patch KB5058921.msu
-      win_command: wusa Z:\KB5058921.msu /quiet /norestart
-      become: yes
-      become_user: SYSTEM
+      win_shell: |
+        Start-Process wusa -ArgumentList "Z:\KB5058921.msu /quiet /norestart" -Verb runAs
+      become: no  # Remove become since we are using 'runAs' for admin privileges
 
     - name: Install Patch KB5055521.msu
-      win_command: wusa Z:\KB5055521.msu /quiet /norestart
-      become: yes
-      become_user: SYSTEM
+      win_shell: |
+        Start-Process wusa -ArgumentList "Z:\KB5055521.msu /quiet /norestart" -Verb runAs
+      become: no  # Remove become since we are using 'runAs' for admin privileges
