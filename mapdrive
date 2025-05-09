@@ -13,10 +13,17 @@
         path: '\\192.168.29.132\Patches'
         state: present
 
-    - name: Check if Z drive is mapped
-      win_shell: Get-PSDrive -Letter Z -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path
+    - name: Check if Z drive is mapped (compatible with older PowerShell)
+      win_shell: |
+        $zDrive = Get-PSDrive | Where-Object {$_.Root -like "Z:\*"}
+        if ($zDrive) {
+          Write-Output $zDrive.Path
+          exit 0
+        } else {
+          exit 1
+        }
       register: mapped_drive_check
-      failed_when: mapped_drive_check.stdout == ""
+      failed_when: mapped_drive_check.rc == 1
       changed_when: false
 
     - name: Install Patch KB5058921.msu using UNC path
