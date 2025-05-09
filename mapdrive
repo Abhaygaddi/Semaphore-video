@@ -1,16 +1,31 @@
 ---
-- name: Map share and run patch script
+- name: Run patch script from shared drive on Windows hosts
   hosts: all
   gather_facts: no
-  tasks:
-    - name: Map network drive and run patch script
-      win_shell: |
-        $cred = New-Object System.Management.Automation.PSCredential ("testdc\ansible", (ConvertTo-SecureString "0pT1mus9r1me#" -AsPlainText -Force))
-        New-PSDrive -Name "Z" -PSProvider FileSystem -Root "\\192.168.29.132\Patches" -Credential $cred -Persist
-        powershell.exe -ExecutionPolicy Bypass -File "Z:\Patch.ps1"
-      register: update_result
-      ignore_errors: yes
+  vars:
+    drive_letter: "Z"
+    share_path: "\\192.168.29.132\Patches"
+    domain_user: "testdc\\ansible"
+    domain_pass: "0pT1mus9r1me#"
+    script_path: "Z:\\Patch.ps1"
 
-    - name: Show update result
+  tasks:
+    - name: Map network drive to {{ drive_letter }}:
+      win_shell: |
+        $cred = New-Object System.Management.Automation.PSCredential ("{{ domain_user }}", (ConvertTo-SecureString "{{ domain_pass }}" -AsPlainText -Force))
+        New-PSDrive -Name "{{ drive_letter }}" -PSProvider FileSystem -Root "{{ share_path }}" -Credential $cred -Persist
+      register: map_result
+
+    - name: Run patch script from shared drive
+      win_shell: |
+        powershell.exe -ExecutionPolicy Bypass -File "{{ script_path }}"
+      register: patch_result
+
+    - name: Show script output
       debug:
-        var: update_result
+        var: patch_result.stdout_lines
+
+    - name: Remove mapped drive {{ drive_letter }}:
+      win_shell: |
+        Remove-PSDrive -Name "{{ drive_letter }}"
+      when: map_result is succeeded
