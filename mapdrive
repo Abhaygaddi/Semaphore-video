@@ -1,44 +1,20 @@
----
-- name: Install Windows patch from network share
-  hosts: windows
-  gather_facts: no
-  vars:
-    share_path: "\\\\192.168.29.132\\Patches"   # Properly escaped UNC path
-    patch_file: "KB5058921.msu"
-    mapped_drive: "Z"
-    domain_user: "DOMAIN\\ansible"             # Replace DOMAIN or use .\ansible for local user
-    domain_pass: "0pT1mus9r1me#"
+- win_mapped_drive:
+    letter: Z
+    path: \\192.168.29.132\Patches
+    state: present
+  become: yes
+  become_user: SYSTEM
 
-  tasks:
-    - name: Unmap drive Z if it exists
-      win_command: "net use {{ mapped_drive }}: /delete"
-      ignore_errors: true
+- win_shell: |
+    net use *
+    Get-PSDrive -Name Z
+  become: yes
+  become_user: SYSTEM
 
-    - name: Map network drive
-      win_command: >
-        net use {{ mapped_drive }}: {{ share_path }} /user:{{ domain_user }} {{ domain_pass }}
-      register: map_result
-      ignore_errors: true
+- win_reboot:
 
-    - name: Fail if mapping failed
-      fail:
-        msg: "Failed to map network drive. Details: {{ map_result }}"
-      when: map_result.rc != 0
-
-    - name: Check if patch file exists on mapped drive
-      win_command: "dir {{ mapped_drive }}:\\{{ patch_file }}"
-      register: file_check
-      failed_when: file_check.rc != 0
-
-    - name: Install patch using wusa.exe from mapped drive
-      win_command: >
-        wusa.exe "{{ mapped_drive }}:\\{{ patch_file }}" /quiet /norestart
-      become: yes
-      become_method: runas
-      become_user: SYSTEM
-      register: patch_result
-      failed_when: patch_result.rc != 0
-
-    - name: Unmap network drive
-      win_command: "net use {{ mapped_drive }}: /delete"
-      when: map_result.rc == 0
+- win_shell: |
+    net use *
+    Get-PSDrive -Name Z -ErrorAction Ignore
+  become: yes
+  become_user: SYSTEM
