@@ -20,7 +20,7 @@
     - name: Fail if KB5058921.msu does not exist
       fail:
         msg: "Patch file '{{ kb5058921_path }}' does not exist or is not accessible on the network share."
-      when: not kb5058921_stat.exists
+      when: not kb5058921_stat.stat.exists
 
     - name: Install Patch KB5058921.msu using UNC path
       win_package:
@@ -42,7 +42,7 @@
     - name: Fail if KB5055521.msu does not exist
       fail:
         msg: "Patch file '{{ kb5055521_path }}' does not exist or is not accessible on the network share."
-      when: not kb5055521_stat.exists
+      when: not kb5055521_stat.stat.exists
 
     - name: Install Patch KB5055521.msu using UNC path
       win_package:
