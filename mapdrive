@@ -1,23 +1,28 @@
 - name: Install patch directly from network share on Windows
-  hosts: windows
+  hosts: windows_servers
   gather_facts: false
 
   vars:
-    patch_share_path: "\\\\192.168.29.132\\Patches\\KB50558921.msu"  # UNC path to the patch
+    patch_share_path: "\\\\192.168.29.132\\Patches\\KB50558921.msu"
 
   tasks:
-    - name: Ensure patch file exists on the share
-      win_command: >
-        if exist "{{ patch_share_path }}" (echo Found) else (echo Missing & exit 1)
-      register: path_check
-      failed_when: "'Missing' in path_check.stdout"
+    - name: Check if patch file exists on share
+      win_shell: |
+        if (Test-Path "{{ patch_share_path }}") {
+          Write-Output "Found"
+        } else {
+          Write-Output "Missing"
+          exit 1
+        }
+      register: patch_check
+      failed_when: "'Missing' in patch_check.stdout"
 
-    - name: Install the .msu patch silently from share
+    - name: Install patch directly from network share
       win_command: >
         wusa.exe "{{ patch_share_path }}" /quiet /norestart
-      register: install_result
-      failed_when: install_result.rc != 0
+      register: patch_install
+      failed_when: patch_install.rc != 0
 
     - name: Show patch install output
       debug:
-        var: install_result.stdout
+        var: patch_install.stdout
