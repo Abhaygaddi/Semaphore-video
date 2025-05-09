@@ -1,32 +1,30 @@
 ---
-- name: Install patches from network share and reboot if needed
+- name: Install patches from network share and reboot if needed (UNC path only)
   hosts: windows
   gather_facts: yes
   become: yes
   become_method: runas
-  become_user: testdc\ansible # Or an account with local admin rights
+  become_user: Administrator # Or an account with local admin rights
+
+  vars:
+    patch_share: '\\\\192.168.29.132\\Patches'
+    kb5058921_path: '{{ patch_share }}\\KB5058921.msu'
+    kb5055521_path: '{{ patch_share }}\\KB5055521.msu'
 
   tasks:
-    - name: Map network drive Z (for patch access and verification)
-      win_mapped_drive:
-        letter: Z
-        path: '\\192.168.29.132\Patches'
-        state: present
-      register: map_result
+    - name: Check if KB5058921.msu exists on the share
+      win_stat:
+        path: '{{ kb5058921_path }}'
+      register: kb5058921_stat
 
-    - name: Fail if Z drive was not successfully mapped or is not present
-      win_shell: |
-        $zDrive = Get-PSDrive | Where-Object {$_.Root -like "Z:\\*"}
-        if (-not $zDrive) {
-          Write-Error "Z: drive is not accessible."
-          exit 1
-        }
-      failed_when: "'Z: drive is not accessible.' in mapped_drive_check.stderr"
-      register: mapped_drive_check
+    - name: Fail if KB5058921.msu does not exist
+      fail:
+        msg: "Patch file '{{ kb5058921_path }}' does not exist or is not accessible on the network share."
+      when: not kb5058921_stat.exists
 
     - name: Install Patch KB5058921.msu using UNC path
       win_package:
-        path: '\\\\192.168.29.132\\Patches\\KB5058921.msu'
+        path: '{{ kb5058921_path }}'
         state: present
         arguments: '/quiet /norestart'
       register: kb5058921_result
@@ -36,9 +34,19 @@
         Add-Content -Path "C:\patch_install.log" -Value "Patch KB5058921.msu - Exit Code: $($_.ExitCode)"
       when: kb5058921_result is defined
 
+    - name: Check if KB5055521.msu exists on the share
+      win_stat:
+        path: '{{ kb5055521_path }}'
+      register: kb5055521_stat
+
+    - name: Fail if KB5055521.msu does not exist
+      fail:
+        msg: "Patch file '{{ kb5055521_path }}' does not exist or is not accessible on the network share."
+      when: not kb5055521_stat.exists
+
     - name: Install Patch KB5055521.msu using UNC path
       win_package:
-        path: '\\\\192.168.29.132\\Patches\\KB5055521.msu'
+        path: '{{ kb5055521_path }}'
         state: present
         arguments: '/quiet /norestart'
       register: kb5055521_result
