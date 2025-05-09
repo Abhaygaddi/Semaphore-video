@@ -3,40 +3,38 @@
   hosts: windows
   gather_facts: no
   vars:
-    drive_letter: "Z"
+    drive_letter: Z
     share_path: "\\\\192.168.29.132\\Patches"
-    domain_user: "testdc\\ansible"
-    password: "0pT1mus9r1me#"
-    patch_script: "Z:\\Patch.ps1"
+    remote_user: "testdc\\ansible"
+    remote_password: "0pT1mus9r1me#"
+    patch_script_path: "Z:\\Patches\\Patch.ps1"
 
   tasks:
-
     - name: Map network drive
-      win_shell: |
-        net use {{ drive_letter }}: {{ share_path }} /user:{{ domain_user }} "{{ password }}"
-      args:
-        executable: cmd
+      ansible.windows.win_shell: |
+        net use {{ drive_letter }}: {{ share_path }} /user:{{ remote_user }} "{{ remote_password }}"
+      register: net_use_output
+      failed_when: net_use_output.rc != 0
+      ignore_errors: false
 
-    - name: Verify patch script exists
-      win_shell: |
-        if (Test-Path "{{ patch_script }}") {
+    - name: Check if Patch.ps1 exists
+      ansible.windows.win_shell: |
+        if (Test-Path "{{ patch_script_path }}") {
           Write-Host "Found"
         } else {
           Write-Host "Missing"
           exit 1
         }
-      register: script_check
-      failed_when: "'Found' not in script_check.stdout"
+      register: check_patch
+      failed_when: check_patch.rc != 0
 
     - name: Run patch script
-      win_shell: powershell.exe -ExecutionPolicy Bypass -File "{{ patch_script }}"
+      ansible.windows.win_shell: |
+        powershell.exe -ExecutionPolicy Bypass -File "{{ patch_script_path }}"
       register: patch_result
       failed_when: patch_result.rc != 0
-      ignore_errors: no
 
     - name: Unmap network drive
-      win_shell: |
-        net use {{ drive_letter }}: /delete /yes
-      args:
-        executable: cmd
-      ignore_errors: yes
+      ansible.windows.win_shell: |
+        net use {{ drive_letter }}: /delete /y
+      ignore_errors: true
