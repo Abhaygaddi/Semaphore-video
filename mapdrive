@@ -1,31 +1,34 @@
 ---
-- name: "Run patch script from shared drive on Windows hosts"
-  hosts: all
+- name: Run patch script from shared drive on Windows hosts
+  hosts: windows
   gather_facts: no
   vars:
     drive_letter: "Z"
     share_path: "\\\\192.168.29.132\\Patches"
-    domain_user: "testdc\\ansible"
-    domain_pass: "0pT1mus9r1me#"
-    script_path: "Z:\\Patch.ps1"
+    username: "testdc\\ansible"
+    password: "0pT1mus9r1me#"
+    patch_script: "Z:\\Patch.ps1"
 
   tasks:
-    - name: "Map network drive to {{ drive_letter }}:"
+
+    - name: Map network drive using net use
       win_shell: |
-        $cred = New-Object System.Management.Automation.PSCredential ("{{ domain_user }}", (ConvertTo-SecureString "{{ domain_pass }}" -AsPlainText -Force))
-        New-PSDrive -Name "{{ drive_letter }}" -PSProvider FileSystem -Root "{{ share_path }}" -Credential $cred -Persist
+        net use {{ drive_letter }}: {{ share_path }} /user:{{ username }} "{{ password }}"
       register: map_result
+      failed_when: "'The command completed successfully' not in map_result.stdout"
 
-    - name: "Run patch script from shared drive"
+    - name: Run patch script from mapped drive
       win_shell: |
-        powershell.exe -ExecutionPolicy Bypass -File "{{ script_path }}"
+        powershell.exe -ExecutionPolicy Bypass -File "{{ patch_script }}"
       register: patch_result
+      failed_when: patch_result.rc != 0
 
-    - name: "Show script output"
+    - name: Display patch script output
       debug:
         var: patch_result.stdout_lines
 
-    - name: "Remove mapped drive {{ drive_letter }}:"
+    - name: Unmap network drive
       win_shell: |
-        Remove-PSDrive -Name "{{ drive_letter }}"
-      when: map_result is succeeded
+        net use {{ drive_letter }}: /delete /y
+      register: unmap_result
+      failed_when: "'was deleted successfully' not in unmap_result.stdout and 'The network connection could not be found' not in unmap_result.stdout"
