@@ -1,10 +1,13 @@
+---
 - name: Install patches from network share
   hosts: windows_servers
+  gather_facts: no  # Optional, can improve performance by skipping fact gathering
+  
   tasks:
     - name: Map network drive Z:
       win_mapped_drive:
         letter: Z
-        path: \\192.168.29.132\Patches
+        path: '\\192.168.29.132\Patches'
         state: present
 
     - name: Install Patch KB5058921.msu
