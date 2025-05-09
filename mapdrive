@@ -5,30 +5,38 @@
   vars:
     drive_letter: "Z"
     share_path: "\\\\192.168.29.132\\Patches"
-    username: "testdc\\ansible"
+    domain_user: "testdc\\ansible"
     password: "0pT1mus9r1me#"
     patch_script: "Z:\\Patch.ps1"
 
   tasks:
 
-    - name: Map network drive using net use
+    - name: Map network drive
       win_shell: |
-        net use {{ drive_letter }}: {{ share_path }} /user:{{ username }} "{{ password }}"
-      register: map_result
-      failed_when: "'The command completed successfully' not in map_result.stdout"
+        net use {{ drive_letter }}: {{ share_path }} /user:{{ domain_user }} "{{ password }}"
+      args:
+        executable: cmd
 
-    - name: Run patch script from mapped drive
+    - name: Verify patch script exists
       win_shell: |
-        powershell.exe -ExecutionPolicy Bypass -File "{{ patch_script }}"
+        if (Test-Path "{{ patch_script }}") {
+          Write-Host "Found"
+        } else {
+          Write-Host "Missing"
+          exit 1
+        }
+      register: script_check
+      failed_when: "'Found' not in script_check.stdout"
+
+    - name: Run patch script
+      win_shell: powershell.exe -ExecutionPolicy Bypass -File "{{ patch_script }}"
       register: patch_result
       failed_when: patch_result.rc != 0
-
-    - name: Display patch script output
-      debug:
-        var: patch_result.stdout_lines
+      ignore_errors: no
 
     - name: Unmap network drive
       win_shell: |
-        net use {{ drive_letter }}: /delete /y
-      register: unmap_result
-      failed_when: "'was deleted successfully' not in unmap_result.stdout and 'The network connection could not be found' not in unmap_result.stdout"
+        net use {{ drive_letter }}: /delete /yes
+      args:
+        executable: cmd
+      ignore_errors: yes
