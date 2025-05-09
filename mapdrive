@@ -19,14 +19,42 @@
         password: "{{ password }}"
         state: present
 
+    - name: Check if patch KB5058921.msu exists
+      win_stat:
+        path: "Z:\\KB5058921.msu"
+      register: patch_check
+
+    - name: Fail if patch KB5058921.msu is missing
+      fail:
+        msg: "Patch KB5058921.msu is missing from the network share."
+      when: not patch_check.stat.exists
+
     - name: Install patch KB5058921.msu
       win_command: |
-        wusa Z:\{{ item }} /quiet /norestart
-      loop: "{{ patch_files }}"
-      when: item == "KB5058921.msu"
-    
+        wusa Z:\KB5058921.msu /quiet /norestart
+      register: wusa_output
+      ignore_errors: yes
+
+    - name: Debug wusa output for KB5058921.msu
+      debug:
+        var: wusa_output
+
+    - name: Check if patch KB5055521.msu exists
+      win_stat:
+        path: "Z:\\KB5055521.msu"
+      register: patch_check
+
+    - name: Fail if patch KB5055521.msu is missing
+      fail:
+        msg: "Patch KB5055521.msu is missing from the network share."
+      when: not patch_check.stat.exists
+
     - name: Install patch KB5055521.msu
       win_command: |
-        wusa Z:\{{ item }} /quiet /norestart
-      loop: "{{ patch_files }}"
-      when: item == "KB5055521.msu"
+        wusa Z:\KB5055521.msu /quiet /norestart
+      register: wusa_output
+      ignore_errors: yes
+
+    - name: Debug wusa output for KB5055521.msu
+      debug:
+        var: wusa_output
