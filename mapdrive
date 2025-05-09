@@ -1,24 +1,29 @@
-- name: Map network drive to Z:
-  win_mapped_drive:
-    letter: Z
-    path: \\192.168.29.132\Patches
-    state: present
-  become: true
-  become_user: SYSTEM
+- name: Map network drive and verify after reboot
+  hosts: windows
+  gather_facts: false
+  tasks:
 
-- name: Check mapped drives
-  win_shell: |
-    net use
-    Get-PSDrive -Name Z -ErrorAction SilentlyContinue
-  become: true
-  become_user: SYSTEM
+    - name: Map network drive to Z:
+      win_mapped_drive:
+        letter: Z
+        path: "\\192.168.29.132\\Patches"
+        state: present
+      become: true
+      become_user: SYSTEM
 
-- name: Reboot the machine (if needed)
-  win_reboot:
+    - name: Check mapped drives before reboot
+      win_shell: |
+        net use
+        Get-PSDrive -Name Z -ErrorAction SilentlyContinue
+      become: true
+      become_user: SYSTEM
 
-- name: Verify mapped drive after reboot
-  win_shell: |
-    net use
-    Get-PSDrive -Name Z -ErrorAction SilentlyContinue
-  become: true
-  become_user: SYSTEM
+    - name: Reboot the machine
+      win_reboot:
+
+    - name: Check mapped drives after reboot
+      win_shell: |
+        net use
+        Get-PSDrive -Name Z -ErrorAction SilentlyContinue
+      become: true
+      become_user: SYSTEM
