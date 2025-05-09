@@ -1,4 +1,4 @@
-- name: Map network drive
+- name: Map network drive on Windows
   hosts: windows
   gather_facts: false
 
@@ -7,7 +7,7 @@
     password: "0pT1mus9r1me#"
 
   tasks:
-    - name: Map Z: to network share
+    - name: "Map Z drive to network share"
       win_mapped_drive:
         letter: Z
         path: "\\\\192.168.29.132\\Patches"
