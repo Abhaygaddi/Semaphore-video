@@ -1,7 +1,6 @@
 ---
 - name: Install patches from network share and reboot if needed
   hosts: all
-  become: true
   gather_facts: yes
   tasks:
     - name: Map network drive Z: to network share
