@@ -1,7 +1,7 @@
 ---
 - name: Install patches from network share
-  hosts: windows
-  gather_facts: no  # Optional, to improve performance by skipping fact gathering
+  hosts: windows_servers
+  gather_facts: no  # Keep it 'no' if you don't need to gather facts
   
   tasks:
     - name: Map network drive Z
@@ -12,12 +12,10 @@
 
     - name: Install Patch KB5058921.msu
       win_command: wusa Z:\KB5058921.msu /quiet /norestart
-      when: ansible_facts['os_family'] == 'Windows'
       become: yes
       become_user: SYSTEM
 
     - name: Install Patch KB5055521.msu
       win_command: wusa Z:\KB5055521.msu /quiet /norestart
-      when: ansible_facts['os_family'] == 'Windows'
       become: yes
       become_user: SYSTEM
