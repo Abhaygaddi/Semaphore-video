@@ -1,28 +1,33 @@
 ---
 - name: Install patches from network share and reboot if needed
-  hosts: windows
+  hosts: all
+  become: true
   gather_facts: yes
-
   tasks:
-    - name: Map network drive Z
-      win_mapped_drive:
-        letter: Z
-        path: '\\192.168.29.132\Patches'
-        state: present
+    - name: Map network drive Z: to network share
+      win_command: net use Z: \\192.168.29.132\Patches
+      ignore_errors: yes
+      register: network_drive
 
-    - name: Verify that the patch file exists
+    - name: Verify that the network drive is mapped
+      win_command: net use
+      register: net_use_output
+      failed_when: "'Z:' not in net_use_output.stdout"
+      changed_when: false
+
+    - name: Verify that the patch file KB5058921.msu exists
       win_stat:
-        path: 'Z:\\KB5058921.msu'
-      register: patch_status
+        path: Z:\KB5058921.msu
+      register: patch_status_1
 
-    - name: Debug patch file existence
+    - name: Debug patch file existence for KB5058921.msu
       debug:
-        var: patch_status
+        msg: "Patch KB5058921.msu exists: {{ patch_status_1.stat.exists }}"
 
     - name: Install Patch KB5058921.msu if present
       win_shell: |
-        if (Test-Path "Z:\\KB5058921.msu") {
-          $patchPath = "Z:\\KB5058921.msu"
+        if (Test-Path "\\\\192.168.29.132\\Patches\\KB5058921.msu") {
+          $patchPath = "\\\\192.168.29.132\\Patches\\KB5058921.msu"
           Write-Output "Starting installation of $patchPath"
           $process = Start-Process wusa -ArgumentList "$patchPath /quiet /norestart" -PassThru -Wait -Verb runAs
           Add-Content -Path "C:\\patch_install.log" -Value "Patch KB5058921.msu - Exit Code: $($process.ExitCode)"
@@ -34,16 +39,25 @@
         } else {
           Write-Output "Patch KB5058921.msu is missing."
         }
-      register: patch_install_result
+      register: patch_install_result_1
 
-    - name: Debug patch installation result
+    - name: Debug patch installation result for KB5058921.msu
       debug:
-        var: patch_install_result
+        msg: "{{ patch_install_result_1 }}"
+
+    - name: Verify that the patch file KB5055521.msu exists
+      win_stat:
+        path: Z:\KB5055521.msu
+      register: patch_status_2
+
+    - name: Debug patch file existence for KB5055521.msu
+      debug:
+        msg: "Patch KB5055521.msu exists: {{ patch_status_2.stat.exists }}"
 
     - name: Install Patch KB5055521.msu if present
       win_shell: |
-        if (Test-Path "Z:\\KB5055521.msu") {
-          $patchPath = "Z:\\KB5055521.msu"
+        if (Test-Path "\\\\192.168.29.132\\Patches\\KB5055521.msu") {
+          $patchPath = "\\\\192.168.29.132\\Patches\\KB5055521.msu"
           Write-Output "Starting installation of $patchPath"
           $process = Start-Process wusa -ArgumentList "$patchPath /quiet /norestart" -PassThru -Wait -Verb runAs
           Add-Content -Path "C:\\patch_install.log" -Value "Patch KB5055521.msu - Exit Code: $($process.ExitCode)"
@@ -57,12 +71,20 @@
         }
       register: patch_install_result_2
 
-    - name: Debug second patch installation result
+    - name: Debug patch installation result for KB5055521.msu
       debug:
-        var: patch_install_result_2
+        msg: "{{ patch_install_result_2 }}"
 
-    - name: Reboot the server after patch installation (if necessary)
+    - name: Reboot system if needed after patch installation
       win_reboot:
+        msg: "Rebooting system after patch installation"
+        pre_reboot_delay: 60
         reboot_timeout: 600
         test_command: whoami
-      when: patch_install_result.rc == 0 or patch_install_result_2.rc == 0
+      when: patch_install_result_1.rc == 0 or patch_install_result_2.rc == 0
+      register: reboot_result
+
+    - name: Debug reboot result
+      debug:
+        msg: "Reboot result: {{ reboot_result }}"
+      when: reboot_result is defined
