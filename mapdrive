@@ -1,10 +1,16 @@
-- name: Map network drive without credentials
+- name: Map network drive with credentials
   hosts: windows
   gather_facts: false
 
+  vars:
+    username: "testdc\\ansible"  # Or .\username if local
+    password: "0pT1mus9r1me#"
+
   tasks:
-    - name: Map network drive Z to \\192.168.29.132\Patches
+    - name: Map Z: to \\192.168.29.132\Patches
       win_mapped_drive:
         letter: Z
         path: "\\\\192.168.29.132\\Patches"
+        username: "{{ username }}"
+        password: "{{ password }}"
         state: present
