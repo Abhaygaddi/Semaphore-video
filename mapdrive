@@ -1,5 +1,5 @@
 - name: Install patch directly from network share on Windows
-  hosts: windows_servers
+  hosts: windows
   gather_facts: false
 
   vars:
