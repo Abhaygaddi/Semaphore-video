@@ -3,7 +3,7 @@
   hosts: windows
   gather_facts: no
   vars:
-    share_path: "\\\\192.168.29.132\\Patches"   # Double backslashes for UNC path
+    share_path: "\\\\192.168.29.132\\Patches"   # Properly escaped UNC path
     patch_file: "KB50558921.msu"
     mapped_drive: "Z"
     domain_user: "DOMAIN\\ansible"             # Replace DOMAIN or use .\ansible for local user
@@ -24,6 +24,11 @@
       fail:
         msg: "Failed to map network drive. Details: {{ map_result }}"
       when: map_result.rc != 0
+
+    - name: Check if patch file exists on mapped drive
+      win_command: "dir {{ mapped_drive }}:\\{{ patch_file }}"
+      register: file_check
+      failed_when: file_check.rc != 0
 
     - name: Install patch using wusa.exe from mapped drive
       win_command: >
