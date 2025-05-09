@@ -1,16 +1,32 @@
-- name: Map network drive on Windows
+- name: Map network drive and install patches on Windows
   hosts: windows
   gather_facts: false
 
   vars:
     username: "testdc\\ansible"
     password: "0pT1mus9r1me#"
+    patch_directory: "\\\\192.168.29.132\\Patches"
+    patch_files:
+      - "KB5058921.msu"
+      - "KB5055521.msu"
 
   tasks:
-    - name: "Map Z drive to network share"
+    - name: Map network drive to Z
       win_mapped_drive:
         letter: Z
-        path: "\\\\192.168.29.132\\Patches"
+        path: "{{ patch_directory }}"
         username: "{{ username }}"
         password: "{{ password }}"
         state: present
+
+    - name: Install patch KB5058921.msu
+      win_command: |
+        wusa Z:\{{ item }} /quiet /norestart
+      loop: "{{ patch_files }}"
+      when: item == "KB5058921.msu"
+    
+    - name: Install patch KB5055521.msu
+      win_command: |
+        wusa Z:\{{ item }} /quiet /norestart
+      loop: "{{ patch_files }}"
+      when: item == "KB5055521.msu"
