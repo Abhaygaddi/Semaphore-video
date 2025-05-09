@@ -1,23 +1,10 @@
-- name: Map network drive and verify after reboot
+- name: Map network drive without credentials
   hosts: windows
   gather_facts: false
-  tasks:
 
-    - name: Map network drive to Z
+  tasks:
+    - name: Map network drive Z: to \\192.168.29.132\Patches
       win_mapped_drive:
         letter: Z
         path: "\\192.168.29.132\\Patches"
         state: present
-
-    - name: Check mapped drives before reboot
-      win_shell: |
-        net use
-        Get-PSDrive -Name Z -ErrorAction SilentlyContinue
-
-    - name: Reboot the machine
-      win_reboot:
-
-    - name: Check mapped drives after reboot
-      win_shell: |
-        net use
-        Get-PSDrive -Name Z -ErrorAction SilentlyContinue
