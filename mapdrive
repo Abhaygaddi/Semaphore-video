@@ -7,15 +7,21 @@
   become_user: Administrator # Or an account with local admin rights
 
   tasks:
-    - name: Map network drive Z
+    - name: Map network drive Z (for potential later use or verification)
       win_mapped_drive:
         letter: Z
         path: '\\192.168.29.132\Patches'
         state: present
 
-    - name: Install Patch KB5058921.msu
+    - name: Check if Z drive is mapped
+      win_shell: Get-PSDrive -Letter Z -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path
+      register: mapped_drive_check
+      failed_when: mapped_drive_check.stdout == ""
+      changed_when: false
+
+    - name: Install Patch KB5058921.msu using UNC path
       win_package:
-        path: 'Z:\KB5058921.msu'
+        path: '\\\\192.168.29.132\\Patches\\KB5058921.msu'
         state: present
         arguments: '/quiet /norestart'
       register: kb5058921_result
@@ -25,9 +31,9 @@
         Add-Content -Path "C:\patch_install.log" -Value "Patch KB5058921.msu - Exit Code: $($_.ExitCode)"
       when: kb5058921_result is defined
 
-    - name: Install Patch KB5055521.msu
+    - name: Install Patch KB5055521.msu using UNC path
       win_package:
-        path: 'Z:\KB5055521.msu'
+        path: '\\\\192.168.29.132\\Patches\\KB5055521.msu'
         state: present
         arguments: '/quiet /norestart'
       register: kb5055521_result
