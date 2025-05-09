@@ -1,33 +1,44 @@
 ---
-- name: Install patches from network share
+- name: Install patches from network share and reboot if needed
   hosts: windows
   gather_facts: yes
-  
+
   tasks:
     - name: Map network drive Z
       win_mapped_drive:
         letter: Z
         path: '\\192.168.29.132\Patches'
         state: present
+      become: yes
 
     - name: Install Patch KB5058921.msu
       win_shell: |
         $patchPath = "Z:\KB5058921.msu"
+        $logFile = "C:\patch_install.log"
         $process = Start-Process wusa -ArgumentList "$patchPath /quiet /norestart" -PassThru -Wait -Verb runAs
+        Add-Content -Path $logFile -Value "Patch KB5058921.msu - Exit Code: $($process.ExitCode)"
         if ($process.ExitCode -eq 0) {
           Write-Output "Patch KB5058921.msu installed successfully."
         } else {
           Write-Output "Failed to install patch KB5058921.msu. Exit code: $($process.ExitCode)"
         }
-      become: no  # Ensure that we are using `runAs` for admin privileges
+      become: yes
 
     - name: Install Patch KB5055521.msu
       win_shell: |
         $patchPath = "Z:\KB5055521.msu"
+        $logFile = "C:\patch_install.log"
         $process = Start-Process wusa -ArgumentList "$patchPath /quiet /norestart" -PassThru -Wait -Verb runAs
+        Add-Content -Path $logFile -Value "Patch KB5055521.msu - Exit Code: $($process.ExitCode)"
         if ($process.ExitCode -eq 0) {
           Write-Output "Patch KB5055521.msu installed successfully."
         } else {
           Write-Output "Failed to install patch KB5055521.msu. Exit code: $($process.ExitCode)"
         }
-      become: no  # Ensure that we are using `runAs` for admin privileges
+      become: yes
+
+    - name: Reboot the server after patch installation (if necessary)
+      win_reboot:
+        reboot_timeout: 600
+        test_command: whoami
+      become: yes
