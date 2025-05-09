@@ -1,6 +1,6 @@
 ---
 - name: Install patches from network share
-  hosts: windows_servers
+  hosts: windows
   gather_facts: no  # Optional, to improve performance by skipping fact gathering
   
   tasks:
