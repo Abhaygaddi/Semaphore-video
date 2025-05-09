@@ -6,10 +6,14 @@
     share_path: "\\192.168.29.132\Patches"
     patch_file: "KB50558921.msu"
     mapped_drive: "Z"
-    domain_user: "DOMAIN\\ansible"         # Replace DOMAIN with actual domain or .\ansible for local user
+    domain_user: "DOMAIN\\ansible"         # Replace DOMAIN or use .\ansible
     domain_pass: "0pT1mus9r1me#"
 
   tasks:
+    - name: Unmap drive Z if it exists
+      win_command: "net use {{ mapped_drive }}: /delete"
+      ignore_errors: true
+
     - name: Map network drive
       win_command: >
         net use {{ mapped_drive }}: {{ share_path }} /user:{{ domain_user }} {{ domain_pass }}
