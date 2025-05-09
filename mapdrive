@@ -8,15 +8,11 @@
         letter: Z
         path: "\\192.168.29.132\\Patches"
         state: present
-      become: true
-      become_user: SYSTEM
 
     - name: Check mapped drives before reboot
       win_shell: |
         net use
         Get-PSDrive -Name Z -ErrorAction SilentlyContinue
-      become: true
-      become_user: SYSTEM
 
     - name: Reboot the machine
       win_reboot:
@@ -25,5 +21,3 @@
       win_shell: |
         net use
         Get-PSDrive -Name Z -ErrorAction SilentlyContinue
-      become: true
-      become_user: SYSTEM
