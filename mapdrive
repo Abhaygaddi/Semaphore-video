@@ -12,10 +12,22 @@
 
     - name: Install Patch KB5058921.msu
       win_shell: |
-        Start-Process wusa -ArgumentList "Z:\KB5058921.msu /quiet /norestart" -Verb runAs
-      become: no  # Remove become since we are using 'runAs' for admin privileges
+        $patchPath = "Z:\KB5058921.msu"
+        $process = Start-Process wusa -ArgumentList "$patchPath /quiet /norestart" -PassThru -Wait -Verb runAs
+        if ($process.ExitCode -eq 0) {
+          Write-Output "Patch KB5058921.msu installed successfully."
+        } else {
+          Write-Output "Failed to install patch KB5058921.msu. Exit code: $($process.ExitCode)"
+        }
+      become: no  # Ensure that we are using `runAs` for admin privileges
 
     - name: Install Patch KB5055521.msu
       win_shell: |
-        Start-Process wusa -ArgumentList "Z:\KB5055521.msu /quiet /norestart" -Verb runAs
-      become: no  # Remove become since we are using 'runAs' for admin privileges
+        $patchPath = "Z:\KB5055521.msu"
+        $process = Start-Process wusa -ArgumentList "$patchPath /quiet /norestart" -PassThru -Wait -Verb runAs
+        if ($process.ExitCode -eq 0) {
+          Write-Output "Patch KB5055521.msu installed successfully."
+        } else {
+          Write-Output "Failed to install patch KB5055521.msu. Exit code: $($process.ExitCode)"
+        }
+      become: no  # Ensure that we are using `runAs` for admin privileges
