@@ -1,7 +1,7 @@
 ---
 - name: Install patches from network share
   hosts: windows_servers
-  gather_facts: no  # Optional, can improve performance by skipping fact gathering
+  gather_facts: no
   
   tasks:
     - name: Map network drive Z:
