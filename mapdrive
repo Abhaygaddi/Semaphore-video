@@ -1,40 +1,23 @@
----
-- name: Run patch script from shared drive on Windows hosts
+- name: Install patch directly from network share on Windows
   hosts: windows
-  gather_facts: no
+  gather_facts: false
+
   vars:
-    drive_letter: Z
-    share_path: "\\\\192.168.29.132\\Patches"
-    remote_user: "testdc\\ansible"
-    remote_password: "0pT1mus9r1me#"
-    patch_script_path: "Z:\\Patches\\Patch.ps1"
+    patch_share_path: "\\\\192.168.29.132\\Patches\\KB50558921.msu"  # UNC path to the patch
 
   tasks:
-    - name: Map network drive
-      ansible.windows.win_shell: |
-        net use {{ drive_letter }}: {{ share_path }} /user:{{ remote_user }} "{{ remote_password }}"
-      register: net_use_output
-      failed_when: net_use_output.rc != 0
-      ignore_errors: false
+    - name: Ensure patch file exists on the share
+      win_command: >
+        if exist "{{ patch_share_path }}" (echo Found) else (echo Missing & exit 1)
+      register: path_check
+      failed_when: "'Missing' in path_check.stdout"
 
-    - name: Check if Patch.ps1 exists
-      ansible.windows.win_shell: |
-        if (Test-Path "{{ patch_script_path }}") {
-          Write-Host "Found"
-        } else {
-          Write-Host "Missing"
-          exit 1
-        }
-      register: check_patch
-      failed_when: check_patch.rc != 0
+    - name: Install the .msu patch silently from share
+      win_command: >
+        wusa.exe "{{ patch_share_path }}" /quiet /norestart
+      register: install_result
+      failed_when: install_result.rc != 0
 
-    - name: Run patch script
-      ansible.windows.win_shell: |
-        powershell.exe -ExecutionPolicy Bypass -File "{{ patch_script_path }}"
-      register: patch_result
-      failed_when: patch_result.rc != 0
-
-    - name: Unmap network drive
-      ansible.windows.win_shell: |
-        net use {{ drive_letter }}: /delete /y
-      ignore_errors: true
+    - name: Show patch install output
+      debug:
+        var: install_result.stdout
