@@ -67,7 +67,7 @@
             Write-Output "Failed to install patch KB5055521.msu. Exit code: $($process.ExitCode)"
           }
         } else {
-          Write-Output "Patch KB5055521.msu is missing.
+          Write-Output "Patch KB5055521.msu is missing."
         }
       register: patch_install_result_2
 
