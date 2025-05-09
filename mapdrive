@@ -1,28 +1,29 @@
-- name: Install patch directly from network share on Windows
+- name: Install patch from network share with credentials
   hosts: windows
   gather_facts: false
 
   vars:
-    patch_share_path: "\\\\192.168.29.132\\Patches\\KB50558921.msu"
+    share_path: "\\\\192.168.29.132\\Patches\\KB50558921.msu"
+    share_user: "testdc\\ansible"
+    share_password: "0pT1mus9r1me#"
 
   tasks:
-    - name: Check if patch file exists on share
-      win_shell: |
-        if (Test-Path "{{ patch_share_path }}") {
-          Write-Output "Found"
-        } else {
-          Write-Output "Missing"
-          exit 1
-        }
-      register: patch_check
-      failed_when: "'Missing' in patch_check.stdout"
+    - name: Map network share with credentials
+      win_command: >
+        net use \\192.168.29.132\Patches "{{ share_password }}" /user:{{ share_user }}
+      register: net_use
+      failed_when: net_use.rc != 0 and '"The command completed successfully."' not in net_use.stdout
 
     - name: Install patch directly from network share
       win_command: >
-        wusa.exe "{{ patch_share_path }}" /quiet /norestart
+        wusa.exe "{{ share_path }}" /quiet /norestart
       register: patch_install
       failed_when: patch_install.rc != 0
 
-    - name: Show patch install output
+    - name: Disconnect network share
+      win_command: net use \\192.168.29.132\Patches /delete /yes
+      ignore_errors: true
+
+    - name: Show install output
       debug:
         var: patch_install.stdout
