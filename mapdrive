@@ -7,24 +7,22 @@
   become_user: Administrator # Or an account with local admin rights
 
   tasks:
-    - name: Map network drive Z (for potential later use or verification)
+    - name: Map network drive Z (for patch access and verification)
       win_mapped_drive:
         letter: Z
         path: '\\192.168.29.132\Patches'
         state: present
+      register: map_result
 
-    - name: Check if Z drive is mapped (compatible with older PowerShell)
+    - name: Fail if Z drive was not successfully mapped or is not present
       win_shell: |
-        $zDrive = Get-PSDrive | Where-Object {$_.Root -like "Z:\*"}
-        if ($zDrive) {
-          Write-Output $zDrive.Path
-          exit 0
-        } else {
+        $zDrive = Get-PSDrive | Where-Object {$_.Root -like "Z:\\*"}
+        if (-not $zDrive) {
+          Write-Error "Z: drive is not accessible."
           exit 1
         }
+      failed_when: "'Z: drive is not accessible.' in mapped_drive_check.stderr"
       register: mapped_drive_check
-      failed_when: mapped_drive_check.rc == 1
-      changed_when: false
 
     - name: Install Patch KB5058921.msu using UNC path
       win_package:
