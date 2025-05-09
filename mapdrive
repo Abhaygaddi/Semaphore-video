@@ -1,60 +1,20 @@
-- name: Map network drive and install patches on Windows
-  hosts: windows
-  gather_facts: false
-
-  vars:
-    username: "testdc\\ansible"
-    password: "0pT1mus9r1me#"
-    patch_directory: "\\\\192.168.29.132\\Patches"
-    patch_files:
-      - "KB5058921.msu"
-      - "KB5055521.msu"
-
+- name: Install patches from network share
+  hosts: windows_servers
   tasks:
-    - name: Map network drive to Z
+    - name: Map network drive Z:
       win_mapped_drive:
         letter: Z
-        path: "{{ patch_directory }}"
-        username: "{{ username }}"
-        password: "{{ password }}"
+        path: \\192.168.29.132\Patches
         state: present
 
-    - name: Check if patch KB5058921.msu exists
-      win_stat:
-        path: "Z:\\KB5058921.msu"
-      register: patch_check
+    - name: Install Patch KB5058921.msu
+      win_command: wusa Z:\KB5058921.msu /quiet /norestart
+      when: ansible_facts['os_family'] == 'Windows'
+      become: yes
+      become_user: SYSTEM
 
-    - name: Fail if patch KB5058921.msu is missing
-      fail:
-        msg: "Patch KB5058921.msu is missing from the network share."
-      when: not patch_check.stat.exists
-
-    - name: Install patch KB5058921.msu
-      win_command: |
-        wusa Z:\KB5058921.msu /quiet /norestart
-      register: wusa_output
-      ignore_errors: yes
-
-    - name: Debug wusa output for KB5058921.msu
-      debug:
-        var: wusa_output
-
-    - name: Check if patch KB5055521.msu exists
-      win_stat:
-        path: "Z:\\KB5055521.msu"
-      register: patch_check
-
-    - name: Fail if patch KB5055521.msu is missing
-      fail:
-        msg: "Patch KB5055521.msu is missing from the network share."
-      when: not patch_check.stat.exists
-
-    - name: Install patch KB5055521.msu
-      win_command: |
-        wusa Z:\KB5055521.msu /quiet /norestart
-      register: wusa_output
-      ignore_errors: yes
-
-    - name: Debug wusa output for KB5055521.msu
-      debug:
-        var: wusa_output
+    - name: Install Patch KB5055521.msu
+      win_command: wusa Z:\KB5055521.msu /quiet /norestart
+      when: ansible_facts['os_family'] == 'Windows'
+      become: yes
+      become_user: SYSTEM
