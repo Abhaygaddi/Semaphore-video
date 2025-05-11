@@ -1,18 +1,35 @@
 ---
-- name: Install patches from network share and reboot if needed (UNC path only)
+- name: Install patches from network share and reboot if needed (UNC path access test)
   hosts: windows
   gather_facts: yes
   become: yes
   become_method: runas
-  become_user: testdc\ansible # Or an account with local admin rights
+  become_user: Administrator # Or an account with local admin rights
 
   vars:
     patch_share: '\\\\192.168.29.132\\Patches'
     kb5058921_path: '{{ patch_share }}\\KB5058921.msu'
-    kb5055521_path: '{{ patch_share }}\\KB5055521.msu'
 
   tasks:
-    - name: Check if KB5058921.msu exists on the share
+    - name: Test access to the network share using Get-ChildItem
+      win_shell: |
+        Try {
+          Get-ChildItem -Path "{{ patch_share }}" -ErrorAction Stop
+          Write-Output "Successfully accessed the share."
+          exit 0
+        }
+        Catch {
+          Write-Error "Failed to access the share: $($_.Exception.Message)"
+          exit 1
+        }
+      register: share_access_test
+      failed_when: share_access_test.rc != 0
+
+    - name: Debug - Print output of share access test
+      debug:
+        var: share_access_test
+
+    - name: Check if KB5058921.msu exists (after access test)
       win_stat:
         path: '{{ kb5058921_path }}'
       register: kb5058921_stat
@@ -34,43 +51,4 @@
         Add-Content -Path "C:\patch_install.log" -Value "Patch KB5058921.msu - Exit Code: $($_.ExitCode)"
       when: kb5058921_result is defined
 
-    - name: Check if KB5055521.msu exists on the share
-      win_stat:
-        path: '{{ kb5055521_path }}'
-      register: kb5055521_stat
-
-    - name: Fail if KB5055521.msu does not exist
-      fail:
-        msg: "Patch file '{{ kb5055521_path }}' does not exist or is not accessible on the network share."
-      when: not kb5055521_stat.stat.exists
-
-    - name: Install Patch KB5055521.msu using UNC path
-      win_package:
-        path: '{{ kb5055521_path }}'
-        state: present
-        arguments: '/quiet /norestart'
-      register: kb5055521_result
-
-    - name: Log KB5055521 installation status
-      win_shell: |
-        Add-Content -Path "C:\patch_install.log" -Value "Patch KB5055521.msu - Exit Code: $($_.ExitCode)"
-      when: kb5055521_result is defined
-
-    - name: Check if reboot is needed
-      win_shell: |
-        $rebootRequired = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending" -ErrorAction SilentlyContinue
-        if ($rebootRequired) {
-          Write-Output "Reboot is pending."
-          exit 1
-        } else {
-          Write-Output "No reboot is pending."
-          exit 0
-        }
-      register: reboot_check
-      failed_when: reboot_check.rc == 1
-      changed_when: reboot_check.rc == 1
-
-    - name: Reboot the server
-      win_reboot:
-        reboot_timeout: 600
-      when: reboot_check.changed
+    # ... (rest of the playbook for the second patch and reboot) ...
