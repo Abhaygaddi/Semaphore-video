@@ -1,5 +1,5 @@
 ---
-- name: Install patches from network share and reboot if needed (UNC path access test)
+- name: Install patches from network share and reboot if needed (Direct wusa test)
   hosts: windows
   gather_facts: yes
   become: yes
@@ -29,26 +29,32 @@
       debug:
         var: share_access_test
 
-    - name: Check if KB5058921.msu exists (after access test)
-      win_stat:
-        path: '{{ kb5058921_path }}'
-      register: kb5058921_stat
-
-    - name: Fail if KB5058921.msu does not exist
-      fail:
-        msg: "Patch file '{{ kb5058921_path }}' does not exist or is not accessible on the network share."
-      when: not kb5058921_stat.stat.exists
-
-    - name: Install Patch KB5058921.msu using UNC path
-      win_package:
-        path: '{{ kb5058921_path }}'
-        state: present
-        arguments: '/quiet /norestart'
-      register: kb5058921_result
-
-    - name: Log KB5058921 installation status
+    - name: Install Patch KB5058921.msu using win_shell (direct wusa)
       win_shell: |
-        Add-Content -Path "C:\patch_install.log" -Value "Patch KB5058921.msu - Exit Code: $($_.ExitCode)"
-      when: kb5058921_result is defined
+        $patchPath = "{{ kb5058921_path }}"
+        Start-Process -FilePath "C:\\Windows\\System32\\wusa.exe" -ArgumentList "$patchPath /quiet /norestart" -Wait -Verb RunAs
+      register: wusa_direct_result
+      ignore_errors: yes
 
-    # ... (rest of the playbook for the second patch and reboot) ...
+    - name: Debug - Print result of direct wusa execution
+      debug:
+        var: wusa_direct_result
+
+    - name: Check if reboot is needed
+      win_shell: |
+        $rebootRequired = Get-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\RebootPending" -ErrorAction SilentlyContinue
+        if ($rebootRequired) {
+          Write-Output "Reboot is pending."
+          exit 1
+        } else {
+          Write-Output "No reboot is pending."
+          exit 0
+        }
+      register: reboot_check
+      failed_when: reboot_check.rc == 1
+      changed_when: reboot_check.rc == 1
+
+    - name: Reboot the server
+      win_reboot:
+        reboot_timeout: 600
+      when: reboot_check.changed
