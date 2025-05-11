@@ -1,14 +1,15 @@
 ---
-- name: Install patches from network share and reboot if needed (Direct wusa test)
+- name: Install patches from network share and force reboot
   hosts: windows
   gather_facts: yes
   become: yes
   become_method: runas
-  become_user: testdc\ansible # Or an account with local admin rights
+  become_user: Administrator # Or an account with local admin rights
 
   vars:
-    patch_share: '\\192.168.29.132\Patches'
+    patch_share: '\\192.168.29.132\\Patches'
     kb5058921_path: '{{ patch_share }}\KB5058921.msu'
+    kb5055521_path: '{{ patch_share }}\KB5055521.msu'
 
   tasks:
     - name: Test access to the network share using Get-ChildItem
@@ -33,28 +34,23 @@
       win_shell: |
         $patchPath = "{{ kb5058921_path }}"
         Start-Process -FilePath "C:\\Windows\\System32\\wusa.exe" -ArgumentList "$patchPath /quiet /norestart" -Wait -Verb RunAs
-      register: wusa_direct_result
-      ignore_errors: yes
+      register: install_kb5058921
 
-    - name: Debug - Print result of direct wusa execution
+    - name: Debug - Print result of KB5058921 installation
       debug:
-        var: wusa_direct_result
+        var: install_kb5058921
 
-    - name: Check if reboot is needed
+    - name: Install Patch KB5055521.msu using win_shell (direct wusa)
       win_shell: |
-        $rebootRequired = Get-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\RebootPending" -ErrorAction SilentlyContinue
-        if ($rebootRequired) {
-          Write-Output "Reboot is pending."
-          exit 1
-        } else {
-          Write-Output "No reboot is pending."
-          exit 0
-        }
-      register: reboot_check
-      failed_when: reboot_check.rc == 1
-      changed_when: reboot_check.rc == 1
+        $patchPath = "{{ kb5055521_path }}"
+        Start-Process -FilePath "C:\\Windows\\System32\\wusa.exe" -ArgumentList "$patchPath /quiet /norestart" -Wait -Verb RunAs
+      register: install_kb5055521
 
-    - name: Reboot the server
+    - name: Debug - Print result of KB5055521 installation
+      debug:
+        var: install_kb5055521
+
+    - name: Force Reboot the server after patch installations
       win_reboot:
         reboot_timeout: 600
-      when: reboot_check.changed
+        force: yes
