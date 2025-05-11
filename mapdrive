@@ -7,8 +7,8 @@
   become_user: testdc\ansible # Or an account with local admin rights
 
   vars:
-    patch_share: '\\\\192.168.29.132\\Patches'
-    kb5058921_path: '{{ patch_share }}\\KB5058921.msu'
+    patch_share: '\\192.168.29.132\Patches'
+    kb5058921_path: '{{ patch_share }}\KB5058921.msu'
 
   tasks:
     - name: Test access to the network share using Get-ChildItem
