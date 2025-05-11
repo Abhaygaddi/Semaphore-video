@@ -1,5 +1,5 @@
 ---
-- name: Install patches from network share and force reboot
+- name: Install patches from network share and force reboot with logging
   hosts: windows
   gather_facts: yes
   become: yes
@@ -10,8 +10,15 @@
     patch_share: '\\192.168.29.132\\Patches'
     kb5058921_path: '{{ patch_share }}\KB5058921.msu'
     kb5055521_path: '{{ patch_share }}\KB5055521.msu'
+    log_dir: 'C:\temp'
+    log_file: '{{ log_dir }}\\patch_installation.log'
 
   tasks:
+    - name: Create C:\temp directory if it doesn't exist
+      win_file:
+        path: '{{ log_dir }}'
+        state: directory
+
     - name: Test access to the network share using Get-ChildItem
       win_shell: |
         Try {
@@ -34,7 +41,19 @@
       win_shell: |
         $patchPath = "{{ kb5058921_path }}"
         Start-Process -FilePath "C:\\Windows\\System32\\wusa.exe" -ArgumentList "$patchPath /quiet /norestart" -Wait -Verb RunAs
+        exit $LASTEXITCODE
       register: install_kb5058921
+
+    - name: Log KB5058921 installation status
+      win_shell: |
+        $logFile = "{{ log_file }}"
+        $patchName = "KB5058921.msu"
+        if ($LASTEXITCODE -eq 0) {
+          Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - INFO: Patch '$patchName' installed successfully."
+        } else {
+          Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - ERROR: Failed to install patch '$patchName'. Exit Code: $($LASTEXITCODE)"
+        }
+      when: install_kb5058921 is defined
 
     - name: Debug - Print result of KB5058921 installation
       debug:
@@ -44,7 +63,19 @@
       win_shell: |
         $patchPath = "{{ kb5055521_path }}"
         Start-Process -FilePath "C:\\Windows\\System32\\wusa.exe" -ArgumentList "$patchPath /quiet /norestart" -Wait -Verb RunAs
+        exit $LASTEXITCODE
       register: install_kb5055521
+
+    - name: Log KB5055521 installation status
+      win_shell: |
+        $logFile = "{{ log_file }}"
+        $patchName = "KB5055521.msu"
+        if ($LASTEXITCODE -eq 0) {
+          Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - INFO: Patch '$patchName' installed successfully."
+        } else {
+          Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - ERROR: Failed to install patch '$patchName'. Exit Code: $($LASTEXITCODE)"
+        }
+      when: install_kb5055521 is defined
 
     - name: Debug - Print result of KB5055521 installation
       debug:
