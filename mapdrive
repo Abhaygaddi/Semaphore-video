@@ -4,7 +4,7 @@
   gather_facts: yes
   become: yes
   become_method: runas
-  become_user: Administrator # Or an account with local admin rights
+  become_user: testdc\ansible # Or an account with local admin rights
 
   vars:
     patch_share: '\\\\192.168.29.132\\Patches'
