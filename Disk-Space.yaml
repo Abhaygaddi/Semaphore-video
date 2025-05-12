@@ -13,7 +13,7 @@
 
     - name: Create temp directory on network share
       win_file:
-        path: "\\\\192.168.29.132\\Patches\\temp"
+        path: "\\192.168.29.132\\Patches\temp"
         state: directory
 
     - name: Get Disk Space Information
