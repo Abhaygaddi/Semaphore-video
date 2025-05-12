@@ -13,7 +13,7 @@
 
     - name: Create temp directory on network share
       win_file:
-        path: "\\192.168.29.132\\Patches\\temp"
+        path: "\\\\192.168.29.132\\Patches\\temp"
         state: directory
 
     - name: Get Disk Space Information
@@ -30,8 +30,8 @@
     - name: Save Disk Space to XML File on Network Share
       win_copy:
         content: "{{ disk_space_xml_raw.stdout }}"
-        dest: "\\192.168.29.132\Patches\temp\{{ hostname }}_disk_space.xml"
+        dest: "\\\\192.168.29.132\\Patches\\temp\\{{ hostname }}_disk_space.xml"
 
     - name: Display Confirmation Message
       debug:
-        msg: "Disk space information saved to \\192.168.29.132\Patches\temp\{{ hostname }}_disk_space.xml"
+        msg: "Disk space information saved to \\\\192.168.29.132\\Patches\\temp\\{{ hostname }}_disk_space.xml"
