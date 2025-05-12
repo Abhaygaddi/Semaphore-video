@@ -1,29 +1,37 @@
 ---
-- name: Check Disk Space on Windows Server 2016
+- name: Check Disk Space on Windows Server 2016 and Save to Network Share
   hosts: windows # Replace with your actual inventory group name
-  gather_facts: yes # Consider enabling facts if you might need them later
+  gather_facts: yes
   tasks:
-    - name: Ensure C:\temp directory exists
+    - name: Get Hostname
+      win_shell: hostname
+      register: hostname_output
+
+    - name: Set Hostname Variable
+      set_fact:
+        hostname: "{{ hostname_output.stdout.strip() }}"
+
+    - name: Create temp directory on network share
       win_file:
-        path: C:\temp
+        path: "\\192.168.29.132\\Patches\\temp"
         state: directory
 
-    - name: Get Disk Space Information and Save to JSON
+    - name: Get Disk Space Information
       win_shell: |
         Get-PSDrive -PSProvider FileSystem |
         Select-Object Name,
-          @{Name='Used(GB)';Expression={[math]::Round($_.Used/1GB,2)}},
-          @{Name='Free(GB)';Expression={[math]::Round($_.Free/1GB,2)}},
-          @{Name='Total(GB)';Expression={[math]::Round($_.Size/1GB,2)}} |
-        ConvertTo-Json
-      register: disk_space_raw
-      failed_when: disk_space_raw.rc != 0 # Fail the task if the command fails
+          @{Name='Used_GB';Expression={[math]::Round($_.Used/1GB,2)}},
+          @{Name='Free_GB';Expression={[math]::Round($_.Free/1GB,2)}},
+          @{Name='Total_GB';Expression={[math]::Round($_.Size/1GB,2)}} |
+        ConvertTo-Xml -As List -Depth 1
+      register: disk_space_xml_raw
+      failed_when: disk_space_xml_raw.rc != 0
 
-    - name: Save Disk Space to JSON File
+    - name: Save Disk Space to XML File on Network Share
       win_copy:
-        content: "{{ disk_space_raw.stdout }}"
-        dest: C:\temp\disk_space.json
+        content: "{{ disk_space_xml_raw.stdout }}"
+        dest: "\\192.168.29.132\Patches\temp\{{ hostname }}_disk_space.xml"
 
-    - name: Display Disk Space
+    - name: Display Confirmation Message
       debug:
-        msg: "{{ disk_space_raw.stdout | from_json }}"
+        msg: "Disk space information saved to \\192.168.29.132\Patches\temp\{{ hostname }}_disk_space.xml"
