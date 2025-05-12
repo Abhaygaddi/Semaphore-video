@@ -13,7 +13,7 @@
 
     - name: Create temp directory on network share using PowerShell
       win_shell: |
-        $path = "\\\\192.168.29.132\\Patches\\temp"
+        $path = '\\\\192.168.29.132\\Patches\\temp'
         if (-not (Test-Path -Path $path)) {
           New-Item -Path $path -ItemType Directory
         }
@@ -34,7 +34,7 @@
     - name: Save Disk Space to XML File on Network Share
       win_copy:
         content: "{{ disk_space_xml_raw.stdout }}"
-        dest: "\\\\192.168.29.132\\Patches\\temp\\{{ hostname }}_disk_space.xml"
+        dest: '\\\\192.168.29.132\\Patches\\temp\\{{ hostname }}_disk_space.xml'
 
     - name: Display Confirmation Message
       debug:
