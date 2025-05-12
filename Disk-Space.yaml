@@ -11,10 +11,14 @@
       set_fact:
         hostname: "{{ hostname_output.stdout.strip() }}"
 
-    - name: Create temp directory on network share
-      win_file:
-        path: "\\192.168.29.132\\Patches\temp"
-        state: directory
+    - name: Create temp directory on network share using PowerShell
+      win_shell: |
+        $path = "\\\\192.168.29.132\\Patches\\temp"
+        if (-not (Test-Path -Path $path)) {
+          New-Item -Path $path -ItemType Directory
+        }
+      register: create_temp_dir
+      failed_when: create_temp_dir.rc != 0
 
     - name: Get Disk Space Information
       win_shell: |
