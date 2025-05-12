@@ -10,7 +10,7 @@
     patch_share: '\\192.168.29.132\\Patches'
     kb5058921_path: '{{ patch_share }}\KB5058921.msu'
     kb5055521_path: '{{ patch_share }}\KB5055521.msu'
-    log_dir: 'C:\temp'
+    log_dir: 'C:\\temp'
     log_file: '{{ log_dir }}\\patch_installation.log'
 
   tasks:
@@ -81,7 +81,5 @@
       debug:
         var: install_kb5055521
 
-    - name: Force Reboot the server after patch installations
-      win_reboot:
-        reboot_timeout: 600
-        force: yes
+    - name: Force Reboot the server
+      win_shell: shutdown /r /f /t 0
