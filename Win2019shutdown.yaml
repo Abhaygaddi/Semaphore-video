@@ -8,8 +8,8 @@
 
   vars:
     patch_share: '\\192.168.29.132\\Patches'
-    kb5058921_path: '{{ patch_share }}\KB5059091.msu'
-    kb5055521_path: '{{ patch_share }}\KB5055519.msu'
+    kb5055519_path: '{{ patch_share }}\KB5055519.msu'
+    kb5059091_path: '{{ patch_share }}\KB5059091.msu'
     log_dir: 'C:\temp'
     log_file: '{{ log_dir }}\\patch_installation.log'
 
@@ -37,28 +37,6 @@
       debug:
         var: share_access_test
 
-    - name: Install Patch KB5059091.msu using win_shell (direct wusa)
-      win_shell: |
-        $patchPath = "{{ kb5059091_path }}"
-        Start-Process -FilePath "C:\\Windows\\System32\\wusa.exe" -ArgumentList "$patchPath /quiet /norestart" -Wait -Verb RunAs
-        exit $LASTEXITCODE
-      register: install_kb5059091
-
-    - name: Log KB5059091 installation status
-      win_shell: |
-        $logFile = "{{ log_file }}"
-        $patchName = "KB5059091.msu"
-        if ($LASTEXITCODE -eq 0) {
-          Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - INFO: Patch '$patchName' installed successfully."
-        } else {
-          Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - ERROR: Failed to install patch '$patchName'. Exit Code: $($LASTEXITCODE)"
-        }
-      when: install_kb5059091 is defined
-
-    - name: Debug - Print result of KB5058921 installation
-      debug:
-        var: install_kb5059091
-
     - name: Install Patch KB5055519.msu using win_shell (direct wusa)
       win_shell: |
         $patchPath = "{{ kb5055519_path }}"
@@ -77,9 +55,31 @@
         }
       when: install_kb5055519 is defined
 
-    - name: Debug - Print result of KB5055521 installation
+    - name: Debug - Print result of KB5055519 installation
       debug:
-        var: install_kb55519
+        var: install_kb5055519
+
+    - name: Install Patch KB5059091.msu using win_shell (direct wusa)
+      win_shell: |
+        $patchPath = "{{ kb5059091_path }}"
+        Start-Process -FilePath "C:\\Windows\\System32\\wusa.exe" -ArgumentList "$patchPath /quiet /norestart" -Wait -Verb RunAs
+        exit $LASTEXITCODE
+      register: install_kb5059091
+
+    - name: Log KB5059091 installation status
+      win_shell: |
+        $logFile = "{{ log_file }}"
+        $patchName = "KB5059091.msu"
+        if ($LASTEXITCODE -eq 0) {
+          Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - INFO: Patch '$patchName' installed successfully."
+        } else {
+          Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - ERROR: Failed to install patch '$patchName'. Exit Code: $($LASTEXITCODE)"
+        }
+      when: install_kb5059091 is defined
+
+    - name: Debug - Print result of KB5059091 installation
+      debug:
+        var: install_kb5059091
 
     - name: Shutdown the server after patch installations
       win_shell: shutdown /s /f /t 0
