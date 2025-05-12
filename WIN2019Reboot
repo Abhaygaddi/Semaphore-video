@@ -1,0 +1,86 @@
+---
+- name: Install patches and restart after completion (Windows Server 2019)
+  hosts: windows
+  gather_facts: yes
+  become: yes
+  become_method: runas
+  become_user: testdc\ansible # Or an account with local admin rights
+
+  vars:
+    patch_share: '\\192.168.29.132\\Patches'
+    kb5055519_path: '{{ patch_share }}\KB5055519.msu'
+    kb5059091_path: '{{ patch_share }}\KB5059091.msu'
+    log_dir: 'C:\temp'
+    log_file: '{{ log_dir }}\\patch_installation.log'
+
+  tasks:
+    - name: Create C:\temp directory if it doesn't exist
+      win_file:
+        path: '{{ log_dir }}'
+        state: directory
+
+    - name: Test access to the network share using Get-ChildItem
+      win_shell: |
+        Try {
+          Get-ChildItem -Path "{{ patch_share }}" -ErrorAction Stop
+          Write-Output "Successfully accessed the share."
+          exit 0
+        }
+        Catch {
+          Write-Error "Failed to access the share: $($_.Exception.Message)"
+          exit 1
+        }
+      register: share_access_test
+      failed_when: share_access_test.rc != 0
+
+    - name: Debug - Print output of share access test
+      debug:
+        var: share_access_test
+
+    - name: Install Patch KB5055519.msu using win_shell (direct wusa)
+      win_shell: |
+        $patchPath = "{{ kb5055519_path }}"
+        Start-Process -FilePath "C:\\Windows\\System32\\wusa.exe" -ArgumentList "$patchPath /quiet /norestart" -Wait -Verb RunAs
+        exit $LASTEXITCODE
+      register: install_kb5055519
+
+    - name: Log KB5055519 installation status
+      win_shell: |
+        $logFile = "{{ log_file }}"
+        $patchName = "KB5055519.msu"
+        if ($LASTEXITCODE -eq 0) {
+          Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - INFO: Patch '$patchName' installed successfully."
+        } else {
+          Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - ERROR: Failed to install patch '$patchName'. Exit Code: $($LASTEXITCODE)"
+        }
+      when: install_kb5055519 is defined
+
+    - name: Debug - Print result of KB5055519 installation
+      debug:
+        var: install_kb5055519
+
+    - name: Install Patch KB5059091.msu using win_shell (direct wusa)
+      win_shell: |
+        $patchPath = "{{ kb5059091_path }}"
+        Start-Process -FilePath "C:\\Windows\\System32\\wusa.exe" -ArgumentList "$patchPath /quiet /norestart" -Wait -Verb RunAs
+        exit $LASTEXITCODE
+      register: install_kb5059091
+
+    - name: Log KB5059091 installation status
+      win_shell: |
+        $logFile = "{{ log_file }}"
+        $patchName = "KB5059091.msu"
+        if ($LASTEXITCODE -eq 0) {
+          Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - INFO: Patch '$patchName' installed successfully."
+        } else {
+          Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - ERROR: Failed to install patch '$patchName'. Exit Code: $($LASTEXITCODE)"
+        }
+      when: install_kb5059091 is defined
+
+    - name: Debug - Print result of KB5059091 installation
+      debug:
+        var: install_kb5059091
+
+    - name: Restart the server after patch installations
+      win_reboot:
+        reboot_timeout: 600
